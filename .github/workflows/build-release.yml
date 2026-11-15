@@ -8,6 +8,8 @@ on:
       - 'Makefile'
       - 'files/**'
       - 'scripts/build-apk.sh'
+      - 'scripts/prepare-release.py'
+      - 'scripts/test-release-version.py'
       - 'scripts/test-ui.cjs'
   workflow_dispatch:
 
@@ -25,10 +27,24 @@ jobs:
     timeout-minutes: 25
     permissions:
       contents: read
+    outputs:
+      name: ${{ steps.version.outputs.name }}
+      version: ${{ steps.version.outputs.version }}
+      release: ${{ steps.version.outputs.release }}
+      tag: ${{ steps.version.outputs.tag }}
+      upstream_tag: ${{ steps.version.outputs.upstream_tag }}
+      upstream_commit: ${{ steps.version.outputs.upstream_commit }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Test release version resolution
+        run: python3 scripts/test-release-version.py
+      - name: Resolve upstream service version and project commit
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/prepare-release.py
       - name: Test UI
         run: node scripts/test-ui.cjs
       - name: Build APK and SHA256 checksum
@@ -72,22 +88,28 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          PACKAGE_NAME: ${{ needs.build.outputs.name }}
+          PACKAGE_VERSION: ${{ needs.build.outputs.version }}
+          PACKAGE_RELEASE: ${{ needs.build.outputs.release }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+          UPSTREAM_TAG: ${{ needs.build.outputs.upstream_tag }}
+          UPSTREAM_COMMIT: ${{ needs.build.outputs.upstream_commit }}
         run: |
           set -euo pipefail
-          name="$(awk -F':=' '$1=="PKG_NAME" {print $2; exit}' Makefile)"
-          version="$(awk -F':=' '$1=="PKG_VERSION" {print $2; exit}' Makefile)"
-          release="$(awk -F':=' '$1=="PKG_RELEASE" {print $2; exit}' Makefile)"
-          tag="v${version}-r${release}"
+          name="$PACKAGE_NAME"
+          version="$PACKAGE_VERSION"
+          release="$PACKAGE_RELEASE"
+          tag="$RELEASE_TAG"
           file="dist/$name-$version-r$release.apk"
           checksum="$file.sha256"
           test -s "$file"
           (cd dist && sha256sum -c "$name-$version-r$release.apk.sha256")
 
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            # A package version is immutable: never overwrite vX-rY with a new source commit.
+            # Keep the full commit check to reject short-hash collisions.
             existing_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.sha')"
             if [ "$existing_sha" != "$GITHUB_SHA" ]; then
-              echo "::error::Release $tag already belongs to $existing_sha. Bump PKG_VERSION or PKG_RELEASE before publishing changed code."
+              echo "::error::Release $tag already belongs to $existing_sha; refusing to overwrite it with $GITHUB_SHA."
               exit 1
             fi
             gh release upload "$tag" "$file" "$checksum" --repo "$GITHUB_REPOSITORY" --clobber
@@ -96,7 +118,7 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --target "$GITHUB_SHA" \
               --title "$name $version-r$release" \
-              --notes "OpenWrt APK v3 (noarch) built and checksum-verified from commit $GITHUB_SHA. This package is unsigned at origin; the central openwrt-packages repository re-signs it for the official feed."
+              --notes "OpenWrt APK v3 (noarch) built and checksum-verified from commit $GITHUB_SHA. Upstream Momo service: release $UPSTREAM_TAG, commit $UPSTREAM_COMMIT. This package is unsigned at origin; the central openwrt-packages repository re-signs it for the official feed."
           fi
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url,assets \
             --jq '{url: .url, assets: [.assets[].name]}'

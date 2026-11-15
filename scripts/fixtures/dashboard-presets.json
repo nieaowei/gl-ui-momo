@@ -1,5 +1,5 @@
 {
-  "source": "https://github.com/nieaowei/OpenWrt-momo/blob/9ce26cce17f52ca206a28e51c74b0e20262ad111/luci-app-momo/htdocs/luci-static/resources/view/momo/mixin.js",
+  "source": "https://github.com/nikkinikki-org/OpenWrt-momo/blob/9ce26cce17f52ca206a28e51c74b0e20262ad111/luci-app-momo/htdocs/luci-static/resources/view/momo/mixin.js",
   "choices": [
     {
       "value": "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip",

@@ -80,13 +80,23 @@ sh scripts/uninstall.sh
 
 ## GitHub Actions 自动构建与 Release
 
-本仓库采用**插件独立构建**：当 `main` 上与软件包相关的内容发生变化时，`.github/workflows/build-release.yml` 自动执行界面测试、`scripts/build-apk.sh`，并以 `v<PKG_VERSION>-r<PKG_RELEASE>` 为标签发布 GitHub Release，附带 APK 与同名 `.sha256` 文件。
+本仓库采用**插件独立构建**：当 `main` 上与软件包相关的内容发生变化时，`.github/workflows/build-release.yml` 自动读取上游最新正式 Release 对应提交中的 `momo/Makefile`，同步服务包的 `PKG_VERSION` 和 `PKG_RELEASE`，再加入本项目提交的前 7 位哈希，执行测试、构建并发布 GitHub Release，附带 APK 与同名 `.sha256` 文件。
+
+例如，上游服务包为 `2026.10.14-r1`、本项目短哈希为 `abcdef0` 时：
+
+| 用途 | 版本或文件名 |
+|---|---|
+| APK 版本 | `2026.10.14~abcdef0-r1` |
+| APK 文件 | `gl-sdk4-ui-momo-2026.10.14~abcdef0-r1.apk` |
+| Release 标签 | `v2026.10.14-r1+abcdef0` |
+
+APK 使用原生支持的 `~` 分隔提交哈希；Git 标签使用 `+`。构建阶段只解析一次版本，发布阶段沿用同一结果，Release 说明记录上游版本和完整提交哈希。
 
 - [下载最新 Release](https://github.com/nieaowei/gl-sdk4-ui-momo/releases/latest)
 - [查看独立构建工作流](https://github.com/nieaowei/gl-sdk4-ui-momo/actions/workflows/build-release.yml)
 - [中央 APK 软件源](https://github.com/nieaowei/openwrt-packages)
 
-**每次更新可安装的插件内容时，请先修改 Makefile 中的 `PKG_VERSION` 或 `PKG_RELEASE`。** 已发布标签不能由其他源码提交覆盖；在版本不变的情况下，新的发布任务会拒绝更新原有 Release。这样能保持安装版本和源码提交的明确对应关系。
+发布时自动同步版本，无需为每次插件修改手动递增版本。解析失败会终止发布；已发布标签不能由其他源码提交覆盖，并校验完整提交哈希以防短哈希碰撞。版本同步只修改构建工作区的 Makefile，不自动提交到仓库。
 
 中央仓库定期读取本仓库最新正式 GitHub Release，仅下载 APK 和校验文件，完成校验、签名并生成 `packages.adb`；中央仓库不再拉取本仓库源码重新编译。可在中央仓库手动运行发布工作流以立即收集本项目的新版本。
 
@@ -102,12 +112,12 @@ sh scripts/build-apk.sh
 sh scripts/build-apk.sh /absolute/path/to/output
 ```
 
-默认输出到仓库内已忽略的 `dist/`，包括 `gl-sdk4-ui-momo-1.3.0-r1.apk` 和同名 `.sha256` 校验文件。构建使用固定摘要的 Alpine 镜像和官方 `apk mkpkg`，生成兼容 APK 3.0.5 的 APKv3、`noarch` 安装包；容器构建阶段不访问网络。元数据、依赖、安装/升级/卸载钩子均从本包 Makefile 读取。原生 Linux 已有带 `mkpkg` 的 apk-tools 3 时，也可以设置 `MOMO_APK_NATIVE=1` 构建。
+默认输出到仓库内已忽略的 `dist/`，包括 `gl-sdk4-ui-momo-2026.10.14-r1.apk` 和同名 `.sha256` 校验文件；本地构建直接使用 Makefile 中的版本。如需采用发布版本规则，可先运行 `python3 scripts/prepare-release.py`，该命令需要 Python 3、Git 和网络，会更新本地 Makefile 中的版本字段。构建使用固定摘要的 Alpine 镜像和官方 `apk mkpkg`，生成兼容 APK 3.0.5 的 APKv3、`noarch` 安装包；容器构建阶段不访问网络。元数据、依赖、安装/升级/卸载钩子均从本包 Makefile 读取。原生 Linux 已有带 `mkpkg` 的 apk-tools 3 时，也可以设置 `MOMO_APK_NATIVE=1` 构建。
 
 将 APK 复制到路由器的 `/tmp/` 后安装：
 
 ```sh
-apk add --allow-untrusted /tmp/gl-sdk4-ui-momo-1.3.0-r1.apk
+apk add --allow-untrusted /tmp/gl-sdk4-ui-momo-2026.10.14-r1.apk
 # 卸载 APK 安装的界面
 apk del gl-sdk4-ui-momo
 ```
@@ -147,7 +157,7 @@ sh scripts/test-no-luci.sh
 
 ## 来源与许可证
 
-本项目从 [nieaowei/OpenWrt-momo](https://github.com/nieaowei/OpenWrt-momo) 的原生界面扩展拆分，遵循 GPL-3.0-or-later，许可证全文见 [LICENSE](LICENSE)。
+本项目从 [nikkinikki-org/OpenWrt-momo](https://github.com/nikkinikki-org/OpenWrt-momo) 的原生界面扩展拆分，遵循 GPL-3.0-or-later，许可证全文见 [LICENSE](LICENSE)。
 
 字段清单和控制面板下载选项参照 Momo 的 LuCI 界面。测试基线保存在 `scripts/luci-fields.json` 和 `scripts/fixtures/dashboard-presets.json`，下载选项基线内记录了来源，不需要原仓库在本机存在。
 

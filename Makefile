@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=gl-sdk4-ui-momo
-PKG_VERSION:=1.3.0
+PKG_VERSION:=2026.10.14
 PKG_RELEASE:=1
 PKG_LICENSE:=GPL-3.0+
 
