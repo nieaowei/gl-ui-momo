@@ -78,6 +78,18 @@ sh scripts/uninstall.sh
 
 卸载只移除原生界面，保留 Momo、订阅与配置。固件升级后若扩展被移除，重新安装即可。
 
+## GitHub Actions 自动构建与 Release
+
+本仓库采用**插件独立构建**：当 `main` 上与软件包相关的内容发生变化时，`.github/workflows/build-release.yml` 自动执行界面测试、`scripts/build-apk.sh`，并以 `v<PKG_VERSION>-r<PKG_RELEASE>` 为标签发布 GitHub Release，附带 APK 与同名 `.sha256` 文件。
+
+- [下载最新 Release](https://github.com/nieaowei/gl-sdk4-ui-momo/releases/latest)
+- [查看独立构建工作流](https://github.com/nieaowei/gl-sdk4-ui-momo/actions/workflows/build-release.yml)
+- [中央 APK 软件源](https://github.com/nieaowei/openwrt-packages)
+
+**每次更新可安装的插件内容时，请先修改 Makefile 中的 `PKG_VERSION` 或 `PKG_RELEASE`。** 已发布标签不能由其他源码提交覆盖；在版本不变的情况下，新的发布任务会拒绝更新原有 Release。这样能保持安装版本和源码提交的明确对应关系。
+
+中央仓库定期读取本仓库最新正式 GitHub Release，仅下载 APK 和校验文件，完成校验、签名并生成 `packages.adb`；中央仓库不再拉取本仓库源码重新编译。可在中央仓库手动运行发布工作流以立即收集本项目的新版本。
+
 ## 编译
 
 ### 直接生成独立 APK
