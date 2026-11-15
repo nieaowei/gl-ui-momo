@@ -66,7 +66,7 @@ apk mkpkg --compat 3.0.0_pre1 --compression deflate:9 \
     --info "name:$name" --info "version:$version-r$release" \
     --info 'arch:noarch' --info "license:$license" --info "origin:$name" \
     --info 'description:Native GL.iNet SDK4 interface for Momo with proxy switching' \
-    --info 'url:https://github.com/nieaowei/gl-sdk4-ui-momo' \
+    --info 'url:https://github.com/nieaowei/gl-ui-momo' \
     --info 'tags:openwrt:section=net' --info "depends:$depends" \
     --script "post-install:$build_root/postinst" \
     --script "post-upgrade:$build_root/postinst" \

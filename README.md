@@ -1,15 +1,17 @@
-# gl-sdk4-ui-momo
+# gl-ui-momo
 
 为 GL.iNet SDK4 后台添加“应用程序 → Momo”。界面使用现有 Vue、GL 组件和 `/rpc` 管理员会话，与 LuCI 共用 Momo 配置。本扩展由本项目维护，并非 GL.iNet 官方发布的软件。
 
 ## 获取源码
 
 ```sh
-git clone https://github.com/nieaowei/gl-sdk4-ui-momo.git
-cd gl-sdk4-ui-momo
+git clone https://github.com/nieaowei/gl-ui-momo.git
+cd gl-ui-momo
 ```
 
 本仓库只包含原生界面插件。Momo 服务由 [OpenWrt-momo](https://github.com/nikkinikki-org/OpenWrt-momo) 提供，需要另行安装。
+
+软件包名为 `gl-ui-momo`。GL 原生后台的软件包卸载接口会拒绝名称中包含 `gl-sdk` 的包，因此不再使用旧包名 `gl-sdk4-ui-momo`。源码仓库已更名为 `nieaowei/gl-ui-momo`，SDK4 视图文件名保持不变。
 
 ## 功能对齐
 
@@ -87,13 +89,13 @@ sh scripts/uninstall.sh
 | 用途 | 版本或文件名 |
 |---|---|
 | APK 版本 | `2026.10.14~abcdef0-r1` |
-| APK 文件 | `gl-sdk4-ui-momo-2026.10.14-abcdef0-r1.apk` |
+| APK 文件 | `gl-ui-momo-2026.10.14-abcdef0-r1.apk` |
 | Release 标签 | `v2026.10.14-r1+abcdef0` |
 
 APK 版本使用原生支持的 `~` 分隔提交哈希；文件名将其替换为 `-`，避免 GitHub 上传时改名导致校验文件失效；Git 标签使用 `+`。构建阶段只解析一次版本，发布阶段沿用同一结果，Release 说明记录上游版本和完整提交哈希。
 
-- [下载最新 Release](https://github.com/nieaowei/gl-sdk4-ui-momo/releases/latest)
-- [查看独立构建工作流](https://github.com/nieaowei/gl-sdk4-ui-momo/actions/workflows/build-release.yml)
+- [下载最新 Release](https://github.com/nieaowei/gl-ui-momo/releases/latest)
+- [查看独立构建工作流](https://github.com/nieaowei/gl-ui-momo/actions/workflows/build-release.yml)
 - [中央 APK 软件源](https://github.com/nieaowei/openwrt-packages)
 
 发布时自动同步版本，无需为每次插件修改手动递增版本。解析失败会终止发布；已发布标签不能由其他源码提交覆盖，并校验完整提交哈希以防短哈希碰撞。版本同步只修改构建工作区的 Makefile，不自动提交到仓库。
@@ -112,17 +114,19 @@ sh scripts/build-apk.sh
 sh scripts/build-apk.sh /absolute/path/to/output
 ```
 
-默认输出到仓库内已忽略的 `dist/`，包括 `gl-sdk4-ui-momo-2026.10.14-r1.apk` 和同名 `.sha256` 校验文件；本地构建直接使用 Makefile 中的版本。如需采用发布版本规则，可先运行 `python3 scripts/prepare-release.py`，该命令需要 Python 3、Git 和网络，会更新本地 Makefile 中的版本字段。构建使用固定摘要的 Alpine 镜像和官方 `apk mkpkg`，生成兼容 APK 3.0.5 的 APKv3、`noarch` 安装包；容器构建阶段不访问网络。元数据、依赖、安装/升级/卸载钩子均从本包 Makefile 读取。原生 Linux 已有带 `mkpkg` 的 apk-tools 3 时，也可以设置 `MOMO_APK_NATIVE=1` 构建。
+默认输出到仓库内已忽略的 `dist/`，包括 `gl-ui-momo-2026.10.14-r1.apk` 和同名 `.sha256` 校验文件；本地构建直接使用 Makefile 中的版本。如需采用发布版本规则，可先运行 `python3 scripts/prepare-release.py`，该命令需要 Python 3、Git 和网络，会更新本地 Makefile 中的版本字段。构建使用固定摘要的 Alpine 镜像和官方 `apk mkpkg`，生成兼容 APK 3.0.5 的 APKv3、`noarch` 安装包；容器构建阶段不访问网络。元数据、依赖、安装/升级/卸载钩子均从本包 Makefile 读取。原生 Linux 已有带 `mkpkg` 的 apk-tools 3 时，也可以设置 `MOMO_APK_NATIVE=1` 构建。
 
 将 APK 复制到路由器的 `/tmp/` 后安装：
 
 ```sh
-apk add --allow-untrusted /tmp/gl-sdk4-ui-momo-2026.10.14-r1.apk
+apk add --allow-untrusted /tmp/gl-ui-momo-2026.10.14-r1.apk
 # 卸载 APK 安装的界面
-apk del gl-sdk4-ui-momo
+apk del gl-ui-momo
 ```
 
 这是本项目构建的未签名本地包，因此安装命令包含 `--allow-untrusted`。包管理器会检查 GL.iNet SDK4、`momo`、Lua 公共库及 curl 依赖，不会安装 `luci-app-momo`。安装/升级/卸载后自动重载 nginx，随后刷新管理页面。
+
+已安装旧包 `gl-sdk4-ui-momo` 时，先通过 SSH 执行 `apk del gl-sdk4-ui-momo`，再安装新包。两者使用相同的 UI 文件路径，应先卸载旧包，避免文件归属冲突。新包可通过 GL 原生后台的软件包页面卸载。
 
 已用 GL-MT3600BE 的 APK 3.0.5 完成完整性校验和无网络模拟安装。
 
@@ -131,8 +135,8 @@ apk del gl-sdk4-ui-momo
 在包含 GL.iNet SDK4 包的 OpenWrt 构建环境中：
 
 ```sh
-git clone https://github.com/nieaowei/gl-sdk4-ui-momo.git package/gl-sdk4-ui-momo
-make package/gl-sdk4-ui-momo/compile V=s
+git clone https://github.com/nieaowei/gl-ui-momo.git package/gl-ui-momo
+make package/gl-ui-momo/compile V=s
 ```
 
 纯 Lua/JavaScript 包，OpenWrt 包定义中的架构为 `all`，生成 APK 时映射为 `noarch`。源码压缩包仍用于脚本安装；可安装的 APK 由上述构建命令生成。

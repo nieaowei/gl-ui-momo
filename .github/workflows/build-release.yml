@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: gl-sdk4-ui-momo-release
+  group: gl-ui-momo-release
   cancel-in-progress: false
 
 jobs:

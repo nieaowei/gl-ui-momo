@@ -20,7 +20,7 @@ class ReleaseVersionTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.makefile = self.root / "Makefile"
-        self.original = "PKG_NAME:=gl-sdk4-ui-momo\nPKG_VERSION:=1.3.0\nPKG_RELEASE:=9\n"
+        self.original = "PKG_NAME:=gl-ui-momo\nPKG_VERSION:=1.3.0\nPKG_RELEASE:=9\n"
         self.makefile.write_text(self.original)
         self.upstream = "PKG_VERSION:=2026.10.14\nPKG_RELEASE:=2\n"
         self.calls = []
