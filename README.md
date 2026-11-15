@@ -87,10 +87,10 @@ sh scripts/uninstall.sh
 | 用途 | 版本或文件名 |
 |---|---|
 | APK 版本 | `2026.10.14~abcdef0-r1` |
-| APK 文件 | `gl-sdk4-ui-momo-2026.10.14~abcdef0-r1.apk` |
+| APK 文件 | `gl-sdk4-ui-momo-2026.10.14-abcdef0-r1.apk` |
 | Release 标签 | `v2026.10.14-r1+abcdef0` |
 
-APK 使用原生支持的 `~` 分隔提交哈希；Git 标签使用 `+`。构建阶段只解析一次版本，发布阶段沿用同一结果，Release 说明记录上游版本和完整提交哈希。
+APK 版本使用原生支持的 `~` 分隔提交哈希；文件名将其替换为 `-`，避免 GitHub 上传时改名导致校验文件失效；Git 标签使用 `+`。构建阶段只解析一次版本，发布阶段沿用同一结果，Release 说明记录上游版本和完整提交哈希。
 
 - [下载最新 Release](https://github.com/nieaowei/gl-sdk4-ui-momo/releases/latest)
 - [查看独立构建工作流](https://github.com/nieaowei/gl-sdk4-ui-momo/actions/workflows/build-release.yml)

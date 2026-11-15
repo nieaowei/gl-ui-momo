@@ -56,9 +56,10 @@ jobs:
           name="$(awk -F':=' '$1=="PKG_NAME" {print $2; exit}' Makefile)"
           version="$(awk -F':=' '$1=="PKG_VERSION" {print $2; exit}' Makefile)"
           release="$(awk -F':=' '$1=="PKG_RELEASE" {print $2; exit}' Makefile)"
-          file="dist/$name-$version-r$release.apk"
+          file_version="$(printf '%s' "$version" | tr '~' '-')"
+          file="dist/$name-$file_version-r$release.apk"
           test -s "$file"
-          (cd dist && sha256sum -c "$name-$version-r$release.apk.sha256")
+          (cd dist && sha256sum -c "$name-$file_version-r$release.apk.sha256")
           echo "Verified package $file"
       - uses: actions/upload-artifact@v4
         with:
@@ -100,10 +101,11 @@ jobs:
           version="$PACKAGE_VERSION"
           release="$PACKAGE_RELEASE"
           tag="$RELEASE_TAG"
-          file="dist/$name-$version-r$release.apk"
+          file_version="$(printf '%s' "$version" | tr '~' '-')"
+          file="dist/$name-$file_version-r$release.apk"
           checksum="$file.sha256"
           test -s "$file"
-          (cd dist && sha256sum -c "$name-$version-r$release.apk.sha256")
+          (cd dist && sha256sum -c "$name-$file_version-r$release.apk.sha256")
 
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             # Keep the full commit check to reject short-hash collisions.
@@ -122,3 +124,8 @@ jobs:
           fi
           gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url,assets \
             --jq '{url: .url, assets: [.assets[].name]}'
+          verify_dir="$(mktemp -d)"
+          trap 'rm -rf "$verify_dir"' EXIT
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" \
+            --pattern '*.apk' --pattern '*.apk.sha256' --dir "$verify_dir"
+          (cd "$verify_dir" && sha256sum -c ./*.apk.sha256)

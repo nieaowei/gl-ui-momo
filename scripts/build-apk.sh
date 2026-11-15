@@ -58,7 +58,9 @@ hook() {
 hook postinst
 hook postrm
 
-filename="$name-$version-r$release.apk"
+# GitHub normalizes ~ in asset names; keep it only in APK version metadata.
+file_version=$(printf '%s' "$version" | tr '~' '-')
+filename="$name-$file_version-r$release.apk"
 # Keep the original root-node layout used by OpenWrt's APK packager.
 apk mkpkg --compat 3.0.0_pre1 --compression deflate:9 \
     --info "name:$name" --info "version:$version-r$release" \
