@@ -1,0 +1,25 @@
+{
+  "source": "https://github.com/nieaowei/OpenWrt-momo/blob/9ce26cce17f52ca206a28e51c74b0e20262ad111/luci-app-momo/htdocs/luci-static/resources/view/momo/mixin.js",
+  "choices": [
+    {
+      "value": "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip",
+      "label": "Zashboard (CDN Fonts)"
+    },
+    {
+      "value": "https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip",
+      "label": "Zashboard"
+    },
+    {
+      "value": "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip",
+      "label": "MetaCubeXD"
+    },
+    {
+      "value": "https://github.com/MetaCubeX/Yacd-meta/archive/refs/heads/gh-pages.zip",
+      "label": "YACD"
+    },
+    {
+      "value": "https://github.com/MetaCubeX/Razord-meta/archive/refs/heads/gh-pages.zip",
+      "label": "Razord"
+    }
+  ]
+}

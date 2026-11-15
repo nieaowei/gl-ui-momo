@@ -1,0 +1,1065 @@
+{
+  "version": "1.3.0",
+  "sections": [
+    {
+      "key": "config",
+      "tab": "general",
+      "label": [
+        "基本设置",
+        "General"
+      ],
+      "groups": [
+        {
+          "key": "app",
+          "label": [
+            "应用设置",
+            "Application"
+          ],
+          "fields": [
+            {
+              "key": "enabled",
+              "label": [
+                "启用 Momo",
+                "Enable Momo"
+              ],
+              "kind": "flag",
+              "optional": false
+            },
+            {
+              "key": "scheduled_restart",
+              "label": [
+                "定时重启",
+                "Scheduled restart"
+              ],
+              "kind": "flag",
+              "optional": false
+            },
+            {
+              "key": "test_profile",
+              "label": [
+                "启动前测试配置",
+                "Test profile before starting"
+              ],
+              "kind": "flag",
+              "optional": false
+            },
+            {
+              "key": "core_only",
+              "label": [
+                "仅运行内核",
+                "Core only"
+              ],
+              "kind": "flag",
+              "optional": false
+            },
+            {
+              "key": "profile",
+              "label": [
+                "当前配置",
+                "Selected profile"
+              ],
+              "kind": "profile",
+              "optional": true
+            },
+            {
+              "key": "start_delay",
+              "label": [
+                "启动延迟（秒）",
+                "Start delay (seconds)"
+              ],
+              "kind": "uint",
+              "optional": true
+            },
+            {
+              "key": "scheduled_restart_cron",
+              "label": [
+                "重启计划（Cron）",
+                "Restart schedule (Cron)"
+              ],
+              "kind": "cron",
+              "optional": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "procd",
+      "tab": "general",
+      "label": [
+        "进程设置",
+        "Process"
+      ],
+      "groups": [
+        {
+          "key": "process",
+          "label": [
+            "进程设置",
+            "Process"
+          ],
+          "fields": [
+            {
+              "key": "fast_reload",
+              "label": [
+                "快速重载",
+                "Fast reload"
+              ],
+              "kind": "flag",
+              "optional": false
+            },
+            {
+              "key": "rlimit_nproc_soft",
+              "label": [
+                "进程数量软限制",
+                "Processes soft limit"
+              ],
+              "kind": "uint",
+              "optional": true
+            },
+            {
+              "key": "rlimit_nproc_hard",
+              "label": [
+                "进程数量硬限制",
+                "Processes hard limit"
+              ],
+              "kind": "uint",
+              "optional": true
+            },
+            {
+              "key": "rlimit_address_space_soft",
+              "label": [
+                "地址空间软限制",
+                "Address space soft limit"
+              ],
+              "kind": "uint",
+              "optional": true
+            },
+            {
+              "key": "rlimit_address_space_hard",
+              "label": [
+                "地址空间硬限制",
+                "Address space hard limit"
+              ],
+              "kind": "uint",
+              "optional": true
+            },
+            {
+              "key": "rlimit_data_soft",
+              "label": [
+                "堆大小软限制",
+                "Heap size soft limit"
+              ],
+              "kind": "uint",
+              "optional": true
+            },
+            {
+              "key": "rlimit_data_hard",
+              "label": [
+                "堆大小硬限制",
+                "Heap size hard limit"
+              ],
+              "kind": "uint",
+              "optional": true
+            },
+            {
+              "key": "rlimit_stack_soft",
+              "label": [
+                "栈大小软限制",
+                "Stack size soft limit"
+              ],
+              "kind": "uint",
+              "optional": true
+            },
+            {
+              "key": "rlimit_stack_hard",
+              "label": [
+                "栈大小硬限制",
+                "Stack size hard limit"
+              ],
+              "kind": "uint",
+              "optional": true
+            },
+            {
+              "key": "rlimit_nofile_soft",
+              "label": [
+                "打开文件数量软限制",
+                "Open files soft limit"
+              ],
+              "kind": "uint",
+              "optional": true
+            },
+            {
+              "key": "rlimit_nofile_hard",
+              "label": [
+                "打开文件数量硬限制",
+                "Open files hard limit"
+              ],
+              "kind": "uint",
+              "optional": true
+            },
+            {
+              "key": "env_go_max_procs",
+              "label": [
+                "GOMAXPROCS",
+                "GOMAXPROCS"
+              ],
+              "kind": "uint",
+              "optional": true
+            },
+            {
+              "key": "env_go_mem_limit",
+              "label": [
+                "GOMEMLIMIT",
+                "GOMEMLIMIT"
+              ],
+              "kind": "uint",
+              "optional": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "proxy",
+      "tab": "proxy",
+      "label": [
+        "代理设置",
+        "Proxy"
+      ],
+      "groups": [
+        {
+          "key": "proxy",
+          "label": [
+            "透明代理",
+            "Transparent proxy"
+          ],
+          "fields": [
+            {
+              "key": "enabled",
+              "label": [
+                "启用透明代理",
+                "Enable transparent proxy"
+              ],
+              "kind": "flag",
+              "optional": false
+            },
+            {
+              "key": "ipv4_dns_hijack",
+              "label": [
+                "IPv4 DNS 劫持",
+                "IPv4 DNS hijacking"
+              ],
+              "kind": "flag",
+              "optional": false
+            },
+            {
+              "key": "ipv6_dns_hijack",
+              "label": [
+                "IPv6 DNS 劫持",
+                "IPv6 DNS hijacking"
+              ],
+              "kind": "flag",
+              "optional": false
+            },
+            {
+              "key": "ipv4_proxy",
+              "label": [
+                "IPv4 代理",
+                "IPv4 proxy"
+              ],
+              "kind": "flag",
+              "optional": false
+            },
+            {
+              "key": "ipv6_proxy",
+              "label": [
+                "IPv6 代理",
+                "IPv6 proxy"
+              ],
+              "kind": "flag",
+              "optional": false
+            },
+            {
+              "key": "fake_ip_ping_hijack",
+              "label": [
+                "Fake IP Ping 劫持",
+                "Fake IP ping hijacking"
+              ],
+              "kind": "flag",
+              "optional": false
+            },
+            {
+              "key": "tcp_mode",
+              "label": [
+                "TCP 代理方式",
+                "TCP mode"
+              ],
+              "kind": "enum",
+              "optional": true,
+              "values": [
+                "redirect",
+                "tproxy",
+                "tun"
+              ]
+            },
+            {
+              "key": "udp_mode",
+              "label": [
+                "UDP 代理方式",
+                "UDP mode"
+              ],
+              "kind": "enum",
+              "optional": true,
+              "values": [
+                "tproxy",
+                "tun"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "router",
+          "label": [
+            "路由器代理",
+            "Router proxy"
+          ],
+          "fields": [
+            {
+              "key": "router_proxy",
+              "label": [
+                "代理路由器流量",
+                "Proxy router traffic"
+              ],
+              "kind": "flag",
+              "optional": false
+            }
+          ]
+        },
+        {
+          "key": "lan",
+          "label": [
+            "局域网代理",
+            "LAN proxy"
+          ],
+          "fields": [
+            {
+              "key": "lan_proxy",
+              "label": [
+                "代理局域网流量",
+                "Proxy LAN traffic"
+              ],
+              "kind": "flag",
+              "optional": false
+            },
+            {
+              "key": "lan_inbound_interface",
+              "label": [
+                "入站接口",
+                "Inbound interfaces"
+              ],
+              "kind": "list",
+              "optional": false,
+              "hint": "interfaces"
+            }
+          ]
+        },
+        {
+          "key": "bypass",
+          "label": [
+            "绕过设置",
+            "Bypass"
+          ],
+          "fields": [
+            {
+              "key": "bypass_china_mainland_ip",
+              "label": [
+                "绕过中国大陆 IPv4",
+                "Bypass mainland China IPv4"
+              ],
+              "kind": "flag",
+              "optional": false
+            },
+            {
+              "key": "bypass_china_mainland_ip6",
+              "label": [
+                "绕过中国大陆 IPv6",
+                "Bypass mainland China IPv6"
+              ],
+              "kind": "flag",
+              "optional": false
+            },
+            {
+              "key": "proxy_tcp_dport",
+              "label": [
+                "需要代理的 TCP 目标端口",
+                "TCP destination ports"
+              ],
+              "kind": "ports",
+              "optional": false
+            },
+            {
+              "key": "proxy_udp_dport",
+              "label": [
+                "需要代理的 UDP 目标端口",
+                "UDP destination ports"
+              ],
+              "kind": "ports",
+              "optional": false
+            },
+            {
+              "key": "bypass_dscp",
+              "label": [
+                "绕过 DSCP",
+                "Bypass DSCP"
+              ],
+              "kind": "list",
+              "optional": true,
+              "hint": "dscp"
+            },
+            {
+              "key": "bypass_fwmark",
+              "label": [
+                "绕过 FWMark",
+                "Bypass FWMark"
+              ],
+              "kind": "list",
+              "optional": true,
+              "hint": "fwmark"
+            }
+          ]
+        },
+        {
+          "key": "misc",
+          "label": [
+            "其他代理参数",
+            "Other proxy settings"
+          ],
+          "fields": [
+            {
+              "key": "reserved_ip",
+              "label": [
+                "保留 IPv4 地址/网段",
+                "Reserved IPv4 addresses/subnets"
+              ],
+              "kind": "list",
+              "optional": true,
+              "hint": "ip4"
+            },
+            {
+              "key": "reserved_ip6",
+              "label": [
+                "保留 IPv6 地址/网段",
+                "Reserved IPv6 addresses/subnets"
+              ],
+              "kind": "list",
+              "optional": true,
+              "hint": "ip6"
+            },
+            {
+              "key": "tun_timeout",
+              "label": [
+                "TUN 超时（秒）",
+                "TUN timeout (seconds)"
+              ],
+              "kind": "uint",
+              "optional": false
+            },
+            {
+              "key": "tun_interval",
+              "label": [
+                "TUN 检测间隔（秒）",
+                "TUN interval (seconds)"
+              ],
+              "kind": "uint",
+              "optional": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "mixin",
+      "tab": "mixin",
+      "label": [
+        "覆写设置",
+        "Overrides"
+      ],
+      "groups": [
+        {
+          "key": "log",
+          "label": [
+            "日志覆写",
+            "Logging overrides"
+          ],
+          "fields": [
+            {
+              "key": "log_disabled",
+              "label": [
+                "禁用内核日志",
+                "Disable core logging"
+              ],
+              "kind": "tristate",
+              "optional": true
+            },
+            {
+              "key": "log_level",
+              "label": [
+                "日志级别",
+                "Log level"
+              ],
+              "kind": "enum",
+              "optional": true,
+              "values": [
+                "trace",
+                "debug",
+                "info",
+                "warn",
+                "error",
+                "fatal",
+                "panic"
+              ]
+            },
+            {
+              "key": "log_timestamp",
+              "label": [
+                "日志时间戳",
+                "Log timestamps"
+              ],
+              "kind": "tristate",
+              "optional": true
+            },
+            {
+              "key": "log_output",
+              "label": [
+                "日志输出路径",
+                "Log output path"
+              ],
+              "kind": "text",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "key": "dns",
+          "label": [
+            "DNS 覆写",
+            "DNS overrides"
+          ],
+          "fields": [
+            {
+              "key": "dns_strategy",
+              "label": [
+                "DNS 策略",
+                "DNS strategy"
+              ],
+              "kind": "enum",
+              "optional": true,
+              "values": [
+                "prefer_ipv4",
+                "prefer_ipv6",
+                "ipv4_only",
+                "ipv6_only"
+              ]
+            },
+            {
+              "key": "dns_disable_cache",
+              "label": [
+                "禁用 DNS 缓存",
+                "Disable DNS cache"
+              ],
+              "kind": "tristate",
+              "optional": true
+            },
+            {
+              "key": "dns_disable_expire",
+              "label": [
+                "禁用 DNS 缓存过期",
+                "Disable DNS cache expiration"
+              ],
+              "kind": "tristate",
+              "optional": true
+            },
+            {
+              "key": "dns_independent_cache",
+              "label": [
+                "独立 DNS 缓存",
+                "Independent DNS cache"
+              ],
+              "kind": "tristate",
+              "optional": true
+            },
+            {
+              "key": "dns_reverse_mapping",
+              "label": [
+                "DNS 反向映射",
+                "DNS reverse mapping"
+              ],
+              "kind": "tristate",
+              "optional": true
+            },
+            {
+              "key": "dns_cache_capacity",
+              "label": [
+                "DNS 缓存容量",
+                "DNS cache capacity"
+              ],
+              "kind": "uint",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "key": "ntp",
+          "label": [
+            "NTP 覆写",
+            "NTP overrides"
+          ],
+          "fields": [
+            {
+              "key": "ntp_enabled",
+              "label": [
+                "启用 NTP",
+                "Enable NTP"
+              ],
+              "kind": "tristate",
+              "optional": true
+            },
+            {
+              "key": "ntp_server",
+              "label": [
+                "NTP 服务器",
+                "NTP server"
+              ],
+              "kind": "text",
+              "optional": true
+            },
+            {
+              "key": "ntp_server_port",
+              "label": [
+                "NTP 端口",
+                "NTP port"
+              ],
+              "kind": "port",
+              "optional": true
+            },
+            {
+              "key": "ntp_interval",
+              "label": [
+                "NTP 更新间隔",
+                "NTP interval"
+              ],
+              "kind": "text",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "key": "cache",
+          "label": [
+            "缓存覆写",
+            "Cache overrides"
+          ],
+          "fields": [
+            {
+              "key": "cache_enabled",
+              "label": [
+                "启用缓存",
+                "Enable cache"
+              ],
+              "kind": "tristate",
+              "optional": true
+            },
+            {
+              "key": "cache_store_fakeip",
+              "label": [
+                "保存 Fake IP 缓存",
+                "Store Fake IP cache"
+              ],
+              "kind": "tristate",
+              "optional": true
+            },
+            {
+              "key": "cache_store_rdrc",
+              "label": [
+                "保存 RDRC 缓存",
+                "Store RDRC cache"
+              ],
+              "kind": "tristate",
+              "optional": true
+            },
+            {
+              "key": "cache_path",
+              "label": [
+                "缓存路径",
+                "Cache path"
+              ],
+              "kind": "text",
+              "optional": true
+            }
+          ]
+        },
+        {
+          "key": "external",
+          "label": [
+            "控制面板与 API",
+            "Dashboard and API"
+          ],
+          "fields": [
+            {
+              "key": "external_control_ui_path",
+              "label": [
+                "控制面板路径",
+                "Dashboard path"
+              ],
+              "kind": "text",
+              "optional": true
+            },
+            {
+              "key": "external_control_ui_download_url",
+              "label": [
+                "控制面板下载地址",
+                "Dashboard download URL"
+              ],
+              "kind": "url",
+              "choices": [
+                {
+                  "value": "https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip",
+                  "label": "Zashboard (CDN Fonts)"
+                },
+                {
+                  "value": "https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip",
+                  "label": "Zashboard"
+                },
+                {
+                  "value": "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip",
+                  "label": "MetaCubeXD"
+                },
+                {
+                  "value": "https://github.com/MetaCubeX/Yacd-meta/archive/refs/heads/gh-pages.zip",
+                  "label": "YACD"
+                },
+                {
+                  "value": "https://github.com/MetaCubeX/Razord-meta/archive/refs/heads/gh-pages.zip",
+                  "label": "Razord"
+                }
+              ],
+              "optional": true
+            },
+            {
+              "key": "external_control_api_listen",
+              "label": [
+                "API 监听地址",
+                "API listen address"
+              ],
+              "kind": "listen",
+              "optional": true
+            },
+            {
+              "key": "external_control_api_secret",
+              "label": [
+                "API 密钥",
+                "API secret"
+              ],
+              "kind": "secret",
+              "optional": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "log",
+      "tab": "logs",
+      "label": [
+        "日志维护",
+        "Log maintenance"
+      ],
+      "groups": [
+        {
+          "key": "maintenance",
+          "label": [
+            "日志维护",
+            "Log maintenance"
+          ],
+          "fields": [
+            {
+              "key": "clear_at_stop",
+              "label": [
+                "停止时清空日志",
+                "Clear logs on stop"
+              ],
+              "kind": "flag",
+              "optional": false
+            },
+            {
+              "key": "scheduled_clear",
+              "label": [
+                "定时清理日志",
+                "Scheduled log clearing"
+              ],
+              "kind": "flag",
+              "optional": false
+            },
+            {
+              "key": "scheduled_clear_cron",
+              "label": [
+                "清理计划（Cron）",
+                "Clearing schedule (Cron)"
+              ],
+              "kind": "cron",
+              "optional": false
+            },
+            {
+              "key": "scheduled_clear_size_limit",
+              "label": [
+                "清理大小阈值",
+                "Clearing size threshold"
+              ],
+              "kind": "uint",
+              "optional": false
+            },
+            {
+              "key": "scheduled_clear_size_limit_unit",
+              "label": [
+                "大小单位",
+                "Size unit"
+              ],
+              "kind": "enum",
+              "optional": false,
+              "values": [
+                "KB",
+                "MB",
+                "GB"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "rules": {
+    "router_access_control": {
+      "label": [
+        "路由器访问控制",
+        "Router access control"
+      ],
+      "fields": [
+        {
+          "key": "enabled",
+          "label": [
+            "启用规则",
+            "Enable rule"
+          ],
+          "kind": "flag",
+          "optional": false
+        },
+        {
+          "key": "user",
+          "label": [
+            "用户",
+            "Users"
+          ],
+          "kind": "list",
+          "optional": true,
+          "hint": "users"
+        },
+        {
+          "key": "group",
+          "label": [
+            "用户组",
+            "Groups"
+          ],
+          "kind": "list",
+          "optional": true,
+          "hint": "groups"
+        },
+        {
+          "key": "cgroup",
+          "label": [
+            "CGroup",
+            "CGroups"
+          ],
+          "kind": "list",
+          "optional": true,
+          "hint": "cgroups"
+        },
+        {
+          "key": "dns",
+          "label": [
+            "DNS 劫持",
+            "DNS hijacking"
+          ],
+          "kind": "flag",
+          "optional": false
+        },
+        {
+          "key": "proxy",
+          "label": [
+            "代理流量",
+            "Proxy traffic"
+          ],
+          "kind": "flag",
+          "optional": false
+        }
+      ]
+    },
+    "lan_access_control": {
+      "label": [
+        "局域网访问控制",
+        "LAN access control"
+      ],
+      "fields": [
+        {
+          "key": "enabled",
+          "label": [
+            "启用规则",
+            "Enable rule"
+          ],
+          "kind": "flag",
+          "optional": false
+        },
+        {
+          "key": "ip",
+          "label": [
+            "IPv4 地址",
+            "IPv4 addresses"
+          ],
+          "kind": "list",
+          "optional": true,
+          "hint": "ip4"
+        },
+        {
+          "key": "ip6",
+          "label": [
+            "IPv6 地址",
+            "IPv6 addresses"
+          ],
+          "kind": "list",
+          "optional": true,
+          "hint": "ip6"
+        },
+        {
+          "key": "mac",
+          "label": [
+            "MAC 地址",
+            "MAC addresses"
+          ],
+          "kind": "list",
+          "optional": true,
+          "hint": "mac"
+        },
+        {
+          "key": "dns",
+          "label": [
+            "DNS 劫持",
+            "DNS hijacking"
+          ],
+          "kind": "flag",
+          "optional": false
+        },
+        {
+          "key": "proxy",
+          "label": [
+            "代理流量",
+            "Proxy traffic"
+          ],
+          "kind": "flag",
+          "optional": false
+        }
+      ]
+    }
+  },
+  "subscription": {
+    "label": [
+      "订阅管理",
+      "Subscriptions"
+    ],
+    "fields": [
+      {
+        "key": "name",
+        "label": [
+          "订阅名称",
+          "Subscription name"
+        ],
+        "kind": "text",
+        "optional": true
+      },
+      {
+        "key": "url",
+        "label": [
+          "订阅地址",
+          "Subscription URL"
+        ],
+        "kind": "url",
+        "optional": true
+      },
+      {
+        "key": "info_url",
+        "label": [
+          "流量信息地址",
+          "Usage URL"
+        ],
+        "kind": "url",
+        "optional": true
+      },
+      {
+        "key": "user_agent",
+        "label": [
+          "User Agent",
+          "User Agent"
+        ],
+        "kind": "text",
+        "optional": true
+      },
+      {
+        "key": "prefer",
+        "label": [
+          "配置优先级",
+          "Profile preference"
+        ],
+        "kind": "enum",
+        "optional": true,
+        "values": [
+          "remote",
+          "local"
+        ]
+      },
+      {
+        "key": "used",
+        "label": [
+          "已用流量",
+          "Used traffic"
+        ],
+        "kind": "readonly",
+        "optional": true
+      },
+      {
+        "key": "total",
+        "label": [
+          "总流量",
+          "Total traffic"
+        ],
+        "kind": "readonly",
+        "optional": true
+      },
+      {
+        "key": "expire",
+        "label": [
+          "到期时间",
+          "Expires"
+        ],
+        "kind": "readonly",
+        "optional": true
+      },
+      {
+        "key": "update",
+        "label": [
+          "上次更新",
+          "Last updated"
+        ],
+        "kind": "readonly",
+        "optional": true
+      }
+    ]
+  }
+}

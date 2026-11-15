@@ -1,0 +1,642 @@
+-- Authenticated GL.iNet SDK4 adapter. UI and validation share one field schema.
+local uci = require "uci"
+local json = require "cjson.safe"
+local fs = require "nixio.fs"
+local nixio = require "nixio"
+local ubus = require "oui.ubus"
+local rpc = require "oui.rpc"
+local ip = require "luci.ip"
+local M = {}
+local dashboard
+local schema_text = assert(fs.readfile("/usr/share/momo-ui/schema.json"))
+local schema = assert(json.decode(schema_text))
+local fields, rule_fields = {}, {}
+for _, section in ipairs(schema.sections) do
+    fields[section.key] = {}
+    for _, group in ipairs(section.groups) do
+        for _, field in ipairs(group.fields) do fields[section.key][field.key] = field end
+    end
+end
+for name, rule in pairs(schema.rules) do
+    rule_fields[name] = {}
+    for _, field in ipairs(rule.fields) do rule_fields[name][field.key] = field end
+end
+local function invalid(message) return rpc.ERROR_CODE_INVALID_PARAMS, message end
+local function failure(message) return {err_code = -1, err_msg = message} end
+local function bus(object, method, args, timeout)
+    -- SDK4's socket calls yield; Lua 5.1 cannot wrap them in pcall.
+    local result,err=ubus.call(object,method,args or {},timeout)
+    if type(result)~="table" then return nil,"RPC "..object.."."..method..": "..tostring(err or "Invalid response") end
+    return result
+end
+local function execute(args,timeout)
+    -- SDK4 proxies commands over a socket; wait() returns output, not an exit code.
+    local process, err = ngx.pipe.spawn(args,{stdout_read_timeout=timeout or 125000,merge_stderr=true})
+    if not process then return nil, err end
+    local output, read_err = process:stdout_read_all()
+    if not output or output=="" then return nil,read_err or "Command returned no response" end
+    return output
+end
+local function command(args,timeout)
+    -- SDK4 has no process exit status API. A fixed shell wrapper records it;
+    -- command arguments remain separate argv entries and are never interpolated.
+    local wrapped={"/bin/sh","-c",'"$@" 2>&1; code=$?; printf "\\nMOMO_UI_EXIT:%s\\n" "$code"',"momo-ui"}
+    for _,value in ipairs(args) do wrapped[#wrapped+1]=value end
+    local output,err=execute(wrapped,timeout or 15000)
+    if not output then return nil,err end
+    local value,status=output:match("^(.*)\nMOMO_UI_EXIT:(%d+)\n$")
+    if not status then return nil,"Command timed out or returned incomplete output" end
+    if tonumber(status)~=0 then return nil,"Command failed (exit "..status.."): "..value:sub(1,512) end
+    return value
+end
+local function package_version(name)
+    for _,source in ipairs({{"/lib/apk/db/installed","P:","V:"},{"/usr/lib/opkg/status","Package: ","Version: "}}) do
+        local database=fs.readfile(source[1]) or ""
+        for record in (database.."\n\n"):gmatch("(.-)\n\n") do
+            local package,version
+            for line in record:gmatch("[^\n]+") do
+                if line:sub(1,#source[2])==source[2] then package=line:sub(#source[2]+1) end
+                if line:sub(1,#source[3])==source[3] then version=line:sub(#source[3]+1) end
+            end
+            if package==name and version then return version end
+        end
+    end
+    return ""
+end
+local function versions()
+    local output=command({"/usr/bin/sing-box","version"},10000)
+    return {app=package_version("momo"),core=output and output:match("sing%-box version ([^%s]+)") or ""}
+end
+local function service(action)
+    local result, err = bus("rc", "init", {name = "momo", action = action}, 120000)
+    if not result then return failure("Cannot control momo: " .. tostring(err)) end
+    return {success = true}
+end
+local function text(value, limit)
+    return type(value) == "string" and #value <= (limit or 4096) and not value:find("[%z\1-\31\127]")
+end
+local function filename(name)
+    return text(name,255) and name ~= "" and not name:match("^%.") and not name:find("[/\\:]") and not name:find("..",1,true)
+end
+local function regular(path)
+    local stat = fs.lstat(path)
+    return not stat or stat.type == "reg"
+end
+local function profile_path(name)
+    if not filename(name) then return nil end
+    local path = "/etc/momo/profiles/" .. name
+    return regular(path) and path or nil
+end
+local function subscription_id(c, id)
+    return type(id) == "string" and id:match("^[%w_]+$") and c:get("momo",id) == "subscription"
+end
+local function profiles(c)
+    local list = {}
+    for name in fs.dir("/etc/momo/profiles") or function() end do
+        local path = profile_path(name)
+        if path and fs.stat(path,"type") == "reg" then list[#list+1] = {value="file:"..name,label=name} end
+    end
+    table.sort(list,function(a,b) return a.value < b.value end)
+    c:foreach("momo","subscription",function(s) list[#list+1] = {value="subscription:"..s[".name"],label=s.name or s[".name"]} end)
+    return list
+end
+local function array(v)
+    if type(v) ~= "table" then return false end
+    for k in pairs(v) do if type(k) ~= "number" or k < 1 or k > #v or k % 1 ~= 0 then return false end end
+    return true
+end
+local function uint(v) return text(v,24) and v:match("^%d+$") ~= nil end
+local function contains(values,v) for _,value in ipairs(values or {}) do if value == v then return true end end return false end
+local function address(v, version)
+    if not text(v,128) then return false end
+    local ok, result = pcall(ip.new,v)
+    return ok and result and (version == 4 and result:is4() or version == 6 and result:is6()) or false
+end
+local function cron(v)
+    if not text(v,128) then return false end
+    local bounds={{0,59},{0,23},{1,31},{1,12},{0,7}}
+    local aliases={{},{},{},{JAN=1,FEB=2,MAR=3,APR=4,MAY=5,JUN=6,JUL=7,AUG=8,SEP=9,OCT=10,NOV=11,DEC=12},{SUN=0,MON=1,TUE=2,WED=3,THU=4,FRI=5,SAT=6}}
+    local index=0
+    for field in v:gmatch("%S+") do
+        index=index+1
+        if not bounds[index] then return false end
+        field=field:upper():gsub("%a+",function(name) return tostring(aliases[index][name] or "invalid") end)
+        if field:find("[^%d*/,%-%s]") or field:match("^,") or field:match(",$") or field:find(",,",1,true) then return false end
+        local low,high=unpack(bounds[index])
+        for item in field:gmatch("[^,]+") do
+            local base,step=item:match("^([^/]+)/(%d+)$")
+            if item:find("/",1,true) and (not base or tonumber(step)<1 or tonumber(step)>high+1) then return false end
+            base=base or item
+            if base~="*" then
+                local a,b=base:match("^(%d+)%-(%d+)$")
+                if not a then a=base:match("^%d+$");b=a end
+                if not a or tonumber(a)<low or tonumber(b)>high or tonumber(a)>tonumber(b) then return false end
+            end
+        end
+    end
+    return index==5
+end
+local function list_item(v,hint)
+    if not text(v,512) or v=="" then return false end
+    if hint=="ip4" then return address(v,4) end
+    if hint=="ip6" then return address(v,6) end
+    if hint=="mac" then return v:match("^%x%x:%x%x:%x%x:%x%x:%x%x:%x%x$") ~= nil end
+    if hint=="dscp" then return uint(v) and tonumber(v)<=63 end
+    if hint=="fwmark" then
+        local function mark(s) return s:match("^0[xX]%x+$") or s:match("^%d+$") end
+        local a,b=v:match("^([^/]+)/([^/]+)$")
+        return a and mark(a) and mark(b) or not v:find("/",1,true) and mark(v) or false
+    end
+    return v:match("^[%w_.@/%-]+$") ~= nil and not v:find("..",1,true)
+end
+local function valid(field,v)
+    if not field then return false end
+    if field.kind=="list" then
+        if not array(v) or #v>1024 then return false end
+        for _,item in ipairs(v) do if not list_item(item,field.hint) then return false end end
+        return true
+    end
+    if not text(v) then return false end
+    if v=="" then return field.optional==true end
+    if field.kind=="flag" or field.kind=="tristate" then return v=="0" or v=="1" end
+    if field.kind=="uint" then return uint(v) end
+    if field.kind=="port" then return uint(v) and tonumber(v)>=1 and tonumber(v)<=65535 end
+    if field.kind=="cron" then return cron(v) end
+    if field.kind=="enum" then return contains(field.values,v) end
+    if field.kind=="url" then return v:match("^https?://[^%s]+$") ~= nil end
+    if field.kind=="listen" then
+        local host,port=v:match("^%[([^%]]+)%]:(%d+)$")
+        if not host then host,port=v:match("^([^:]+):(%d+)$") end
+        return host and (address(host,4) or address(host,6)) and uint(port) and tonumber(port)>=1 and tonumber(port)<=65535 or false
+    end
+    if field.kind=="ports" then
+        local count=0
+        for part in v:gmatch("%S+") do
+            count=count+1
+            local a,b=part:match("^(%d+)[%-:](%d+)$")
+            if not a then a=part:match("^%d+$");b=a end
+            if not a or tonumber(a)>65535 or tonumber(b)>65535 or tonumber(a)>tonumber(b) then return false end
+        end
+        return count>0
+    end
+    return true
+end
+local function read_options(c,id,definitions)
+    local item={}
+    for key,field in pairs(definitions) do
+        local value=c:get("momo",id,key)
+        if field.kind=="list" and type(value)=="string" then value={value} end
+        item[key]=value
+    end
+    return item
+end
+local function save_options(c,id,options)
+    for key,value in pairs(options) do
+        local old=c:get("momo",id,key)
+        local remove=value=="" or type(value)=="table" and #value==0
+        local same=old==value
+        if type(value)=="table" then
+            if type(old)=="string" then same=#value==1 and value[1]==old
+            elseif type(old)=="table" then
+                same=#old==#value
+                for index,item in ipairs(value) do if old[index]~=item then same=false end end
+            end
+        end
+        if remove then if old~=nil then c:delete("momo",id,key) end
+        elseif not same then assert(c:set("momo",id,key,value),"Cannot save "..key) end
+    end
+end
+local function all_ids(c,kind)
+    local ids,anchor={},nil
+    c:foreach("momo",kind,function(s) ids[#ids+1]=s[".name"];anchor=anchor or s[".index"] end)
+    return ids,anchor or 0
+end
+local function stabilize_ids(c)
+    -- Anonymous IDs are regenerated from section positions after a commit.
+    -- Keep existing IDs as explicit names before structural changes, so moving
+    -- ACLs/subscriptions cannot detach the selected profile from its cache file.
+    local ids={}
+    c:foreach("momo",nil,function(s) if s[".anonymous"] then ids[#ids+1]=s[".name"] end end)
+    for _,id in ipairs(ids) do assert(c:rename("momo",id,id)) end
+end
+function M.get_status()
+    local services,err=bus("service","list",{name="momo"})
+    if not services then return failure(err) end
+    local running=false
+    for _,instance in pairs((services.momo or {}).instances or {}) do running=running or instance.running==true end
+    return {running=running,enabled=uci.cursor():get("momo","config","enabled")=="1",clash_api=running and dashboard()~=nil}
+end
+function M.get_config()
+    local c=uci.cursor()
+    local version=versions()
+    local settings,rules,subscriptions={},{},{}
+    for section,definitions in pairs(fields) do settings[section]=read_options(c,section,definitions) end
+    for kind,definitions in pairs(rule_fields) do
+        rules[kind]={}
+        c:foreach("momo",kind,function(s)
+            local row=read_options(c,s[".name"],definitions);row.id=s[".name"]
+            rules[kind][#rules[kind]+1]=row
+        end)
+    end
+    c:foreach("momo","subscription",function(s)
+        local item={id=s[".name"]}
+        for _,field in ipairs(schema.subscription.fields) do item[field.key]=s[field.key] end
+        subscriptions[#subscriptions+1]=item
+    end)
+    local listen=c:get("uhttpd","main","listen_http")
+    if type(listen)=="table" then listen=listen[1] end
+    local port=tonumber(tostring(listen or ""):match(":(%d+)$")) or 8080
+    return {schema=schema,settings=settings,rules=rules,subscriptions=subscriptions,profiles=profiles(c),version=version,luci_port=port,luci_available=fs.stat("/www/luci-static/resources/view/momo/app.js","type")=="reg"}
+end
+function M.set_config(params)
+    if type(params.settings)~="table" then return invalid("Missing settings") end
+    local c=uci.cursor();local available={}
+    for _,p in ipairs(profiles(c)) do available[p.value]=true end
+    for section,options in pairs(params.settings) do
+        if not fields[section] or type(options)~="table" then return invalid("Unknown section") end
+        for key,value in pairs(options) do
+            if not valid(fields[section][key],value) then return invalid("Invalid "..section.."."..key) end
+            if section=="config" and key=="profile" and value~="" and not available[value] then return invalid("Profile not found") end
+        end
+    end
+    if params.rules~=nil then
+        if type(params.rules)~="table" then return invalid("Invalid rules") end
+        for kind,rows in pairs(params.rules) do
+            if not rule_fields[kind] or not array(rows) or #rows>512 then return invalid("Invalid rule group") end
+            local seen={}
+            for _,row in ipairs(rows) do
+                if type(row)~="table" then return invalid("Invalid rule") end
+                if row.id and row.id~="" then
+                    if type(row.id)~="string" or seen[row.id] or c:get("momo",row.id)~=kind then return invalid("Invalid rule ID") end
+                    seen[row.id]=true
+                end
+                for key,value in pairs(row) do
+                    if key~="id" and not valid(rule_fields[kind][key],value) then return invalid("Invalid rule field "..tostring(key)) end
+                end
+            end
+        end
+    end
+    if params.rules and next(params.rules) then stabilize_ids(c) end
+    for section,options in pairs(params.settings) do save_options(c,section,options) end
+    for kind,rows in pairs(params.rules or {}) do
+        local old,anchor=all_ids(c,kind);local keep={}
+        for _,row in ipairs(rows) do if row.id and row.id~="" then keep[row.id]=true end end
+        for _,id in ipairs(old) do if not keep[id] then c:delete("momo",id) end end
+        for index,row in ipairs(rows) do
+            local id=row.id and row.id~="" and row.id or assert(c:add("momo",kind))
+            assert(c:rename("momo",id,id))
+            local options={};for key,value in pairs(row) do if key~="id" then options[key]=value end end
+            save_options(c,id,options);assert(c:reorder("momo",id,anchor+index-1))
+        end
+    end
+    if not c:commit("momo") then return failure("Cannot save configuration") end
+    if params.apply==true then return service("restart") end
+    return {success=true}
+end
+function M.get_hints()
+    local function names(path)
+        local values={}
+        for line in (fs.readfile(path) or ""):gmatch("[^\n]+") do
+            local name=line:match("^([^:]+):");if name then values[#values+1]=name end
+        end
+        table.sort(values);return values
+    end
+    local c=uci.cursor();local result={users=names("/etc/passwd"),groups=names("/etc/group"),cgroups={}}
+    local function cgroups(path,prefix,depth)
+        if depth>16 or #result.cgroups>=2048 then return end
+        for name in fs.dir(path) or function() end do
+            if #result.cgroups>=2048 then return end
+            local relative=prefix..name
+            if name~="." and name~=".." and relative~="services/momo" and not relative:match("^services/momo/") then
+                local stat=fs.lstat(path.."/"..name)
+                if stat and stat.type=="dir" then
+                    result.cgroups[#result.cgroups+1]=relative;cgroups(path.."/"..name,relative.."/",depth+1)
+                end
+            end
+        end
+    end
+    if fs.stat("/sys/fs/cgroup/cgroup.controllers") then cgroups("/sys/fs/cgroup","",0) end
+    table.sort(result.cgroups)
+    result.interfaces={}
+    c:foreach("network","interface",function(s) if s[".name"]~="loopback" then result.interfaces[#result.interfaces+1]=s[".name"] end end)
+    local hosts=bus("luci-rpc","getHostHints")
+    result.ip4,result.ip6,result.mac={},{},{}
+    if hosts then
+        for mac,host in pairs(hosts.hosts or hosts or {}) do
+            if type(host)=="table" then
+                result.mac[#result.mac+1]={value=mac,label=(host.name or mac).." ("..mac..")"}
+                for _,pair in ipairs({{"ip4","ipaddrs"},{"ip6","ip6addrs"}}) do
+                    for _,addr in ipairs(host[pair[2]] or {}) do result[pair[1]][#result[pair[1]]+1]={value=addr,label=(host.name or mac).." ("..addr..")"} end
+                end
+            end
+        end
+    end
+    return result
+end
+function M.service(params)
+    if not contains({"start","stop","reload","restart"},params.action) then return invalid("Invalid service action") end
+    return service(params.action)
+end
+local function log_path(kind)
+    return (kind=="app" or kind=="core") and "/var/log/momo/"..kind..".log" or nil
+end
+function M.get_log(params)
+    local path=log_path(params.kind)
+    if not path then return invalid("Invalid log type") end
+    local value=fs.readfile(path) or ""
+    return {text=value}
+end
+function M.clear_log(params)
+    local path=log_path(params.kind)
+    if not path then return invalid("Invalid log type") end
+    if not fs.writefile(path,"") then return failure("Cannot clear log") end
+    return {success=true}
+end
+function M.debug()
+    local id=(fs.readfile("/proc/sys/kernel/random/uuid") or ""):match("^[%x%-]+")
+    if not id then return failure("Cannot create debug report") end
+    local path="/tmp/momo-ui-debug-"..id
+    local file=nixio.open(path,nixio.open_flags("wronly","creat","excl"),600)
+    if not file then return failure("Cannot create debug report") end
+    file:close()
+    local result,err=command({"/bin/sh","-c",'exec /etc/momo/scripts/debug.sh > "$1"',"momo-debug",path},120000)
+    local value=result and fs.readfile(path);fs.unlink(path)
+    if not value then return failure(err or "Cannot read debug report") end
+    if value=="" then return failure("Empty debug report") end
+    return {text=value}
+end
+-- JSONC: strip comments and trailing commas without touching quoted strings.
+local function jsonc(value)
+    if type(value)~="string" then return nil end
+    value=value:gsub("^\239\187\191","")
+    local out,i,quoted={},1,false
+    while i<=#value do
+        local ch=value:sub(i,i);local nextch=value:sub(i+1,i+1)
+        if quoted then
+            out[#out+1]=ch
+            if ch=="\\" then i=i+1;out[#out+1]=value:sub(i,i) elseif ch=='"' then quoted=false end
+        elseif ch=='"' then quoted=true;out[#out+1]=ch
+        elseif ch=="/" and nextch=="/" then
+            local ending=value:find("\n",i+2,true);i=ending and ending-1 or #value;out[#out+1]=" "
+        elseif ch=="/" and nextch=="*" then
+            local ending=value:find("*/",i+2,true);if not ending then return nil end;i=ending+1;out[#out+1]=" "
+        else out[#out+1]=ch end
+        i=i+1
+    end
+    if quoted then return nil end
+    value=table.concat(out);out={};i=1;quoted=false;local previous=""
+    while i<=#value do
+        local ch=value:sub(i,i)
+        if quoted then
+            out[#out+1]=ch
+            if ch=="\\" then i=i+1;out[#out+1]=value:sub(i,i) elseif ch=='"' then quoted=false end
+        elseif ch=='"' then quoted=true;out[#out+1]=ch
+        elseif ch=="," then
+            local nextpos=value:find("%S",i+1)
+            local rest=nextpos and value:sub(nextpos,nextpos)
+            if rest=="}" or rest=="]" then
+                if previous=="{" or previous=="[" or previous==":" or previous=="," then return nil end
+            else out[#out+1]=ch end
+        else out[#out+1]=ch end
+        if not ch:match("%s") then previous=ch end
+        i=i+1
+    end
+    local clean=table.concat(out)
+    if not clean:match("^%s*{") then return nil end
+    return json.decode(clean)
+end
+dashboard=function()
+    local profile=jsonc(fs.readfile("/etc/momo/run/config.json")) or {}
+    local api=((profile.experimental or {}).clash_api or {})
+    local listen=api.external_controller or ""
+    if type(listen)~="string" then return nil end
+    local host,port=listen:match("^%[([^%]]+)%]:(%d+)$")
+    if not host then host,port=listen:match("^([^:]*):(%d+)$") end
+    port=tonumber(port)
+    if not port or port<1 or port>65535 then return nil end
+    if not host then return nil end
+    if host=="" or host=="localhost" or host=="0.0.0.0" then host="127.0.0.1" elseif host=="::" then host="::1" end
+    if not (address(host,4) or address(host,6)) then return nil end
+    if host:find(":",1,true) then host="["..host.."]" end
+    return {port=port,secret=api.secret or "",host=host}
+end
+function M.get_dashboard() return dashboard() or failure("Clash API is not configured") end
+local function encoded(value)
+    return (value:gsub("[^A-Za-z0-9_.~%-]",function(ch) return string.format("%%%02X",ch:byte()) end))
+end
+-- Fixed local endpoints only. The browser never receives API credentials here.
+local function clash_request(method,path,body,seconds)
+    local api=dashboard();if not api then return nil,"Clash API is not configured" end
+    seconds=seconds or 10
+    local args={"curl","--silent","--show-error","--noproxy","*","--connect-timeout","3","--max-time",tostring(seconds),"--request",method,"--header","Authorization: Bearer "..api.secret,"--write-out","\n%{http_code}"}
+    if body then args[#args+1]="--header";args[#args+1]="Content-Type: application/json";args[#args+1]="--data-binary";args[#args+1]=json.encode(body) end
+    args[#args+1]="http://"..api.host..":"..api.port..path
+    local output,err=execute(args,(seconds+5)*1000)
+    if not output then return nil,err end
+    local content,status=output:match("^(.*)\n(%d%d%d)$")
+    if not status then return nil,"Invalid Clash API response" end
+    local value={};if content~="" then value=json.decode(content) end
+    if tonumber(status)<200 or tonumber(status)>=300 then
+        local message=type(value)=="table" and value.message or content
+        return nil,"Clash API HTTP "..status..": "..tostring(message):sub(1,512)
+    end
+    if type(value)~="table" then return nil,"Invalid Clash API JSON response" end
+    return value
+end
+local function modes(config)
+    local values={}
+    for _,mode in ipairs(type(config["mode-list"])=="table" and config["mode-list"] or {"Rule","Global","Direct"}) do
+        if text(mode,128) and mode~="" then values[#values+1]=mode end
+    end
+    return values
+end
+function M.get_proxies()
+    if not dashboard() then return {enabled=false} end
+    local result,err=clash_request("GET","/proxies")
+    if not result then return failure(err) end
+    if type(result.proxies)~="table" then return failure("Invalid proxy list") end
+    local config;config,err=clash_request("GET","/configs")
+    if not config then return failure(err) end
+    local nodes,groups,seen={},{},{}
+    for name,item in pairs(result.proxies) do
+        if type(item)=="table" then
+            local history=type(item.history)=="table" and item.history or {}
+            local latest=history[#history];if type(latest)~="table" then latest={} end
+            nodes[name]={name=name,type=item.type,now=item.now,all=item.all,delay=tonumber(latest.delay)}
+        end
+    end
+    local function add(name)
+        local node=nodes[name]
+        if node and type(node.all)=="table" and not seen[name] then groups[#groups+1]=name;seen[name]=true end
+    end
+    local profile=jsonc(fs.readfile("/etc/momo/run/config.json")) or {}
+    for _,item in ipairs(profile.outbounds or {}) do add(item.tag) end
+    local remaining={};for name in pairs(nodes) do if name~="GLOBAL" then remaining[#remaining+1]=name end end
+    table.sort(remaining);for _,name in ipairs(remaining) do add(name) end;add("GLOBAL")
+    return {enabled=true,proxies=nodes,groups=groups,mode=config.mode,modes=modes(config)}
+end
+function M.select_proxy(params)
+    if not text(params.group,512) or params.group=="" or not text(params.name,512) or params.name=="" then return invalid("Invalid proxy selection") end
+    local path="/proxies/"..encoded(params.group)
+    local group,err=clash_request("GET",path)
+    if not group then return failure(err) end
+    if group.type~="Selector" or type(group.all)~="table" or not contains(group.all,params.name) then return invalid("Select an existing member of a Selector group") end
+    local result;result,err=clash_request("PUT",path,{name=params.name})
+    return result and {success=true} or failure(err)
+end
+function M.set_clash_mode(params)
+    if not text(params.mode,128) or params.mode=="" then return invalid("Invalid Clash mode") end
+    local config,err=clash_request("GET","/configs")
+    if not config then return failure(err) end
+    if not contains(modes(config),params.mode) then return invalid("Unsupported Clash mode") end
+    local result;result,err=clash_request("PATCH","/configs",{mode=params.mode})
+    return result and {success=true} or failure(err)
+end
+function M.test_proxy(params)
+    if not text(params.name,512) or params.name=="" then return invalid("Invalid proxy name") end
+    local result,err=clash_request("GET","/proxies/"..encoded(params.name).."/delay?timeout=5000&url=https%3A%2F%2Fwww.gstatic.com%2Fgenerate_204",nil,8)
+    if not result then return failure(err) end
+    if type(result.delay)~="number" or result.delay<=0 then return failure("Proxy delay test failed") end
+    return {delay=result.delay}
+end
+function M.update_dashboard()
+    local api=dashboard();if not api then return failure("Clash API is not configured") end
+    local output,err=execute({"curl","--silent","--show-error","--max-time","120","--request","POST","--header","Authorization: Bearer "..api.secret,"--write-out","\n%{http_code}","http://"..api.host..":"..api.port.."/upgrade/ui"})
+    if not output then return failure(err or "Dashboard update failed") end
+    local body,status=output:match("^(.*)\n(%d%d%d)$")
+    if not status then return failure("Invalid dashboard update response: "..output:sub(1,2048)) end
+    if tonumber(status)<200 or tonumber(status)>=300 then
+        return failure("Dashboard update failed (HTTP "..status.."): "..body:sub(1,2048))
+    end
+    return {success=true}
+end
+function M.save_subscription(params)
+    local c=uci.cursor()
+    if params.id and params.id~="" and not subscription_id(c,params.id) then return invalid("Subscription not found") end
+    for _,key in ipairs({"name","url","info_url","user_agent","prefer"}) do
+        if params[key]~=nil and not text(params[key]) then return invalid("Invalid "..key) end
+    end
+    if not params.name or params.name=="" or not params.url or not params.url:match("^https?://[^%s]+$") then return invalid("Name and HTTP(S) URL are required") end
+    if params.info_url and params.info_url~="" and not params.info_url:match("^https?://[^%s]+$") then return invalid("Invalid usage URL") end
+    if not contains({"local","remote"},params.prefer) then return invalid("Invalid preference") end
+    local id=params.id and params.id~="" and params.id
+    if not id then stabilize_ids(c);id=assert(c:add("momo","subscription"));assert(c:rename("momo",id,id)) end
+    for _,key in ipairs({"name","url","info_url","user_agent","prefer"}) do if params[key]~=nil then c:set("momo",id,key,params[key]) end end
+    if not c:commit("momo") then return failure("Cannot save subscription") end
+    return {success=true,id=id}
+end
+function M.update_subscription(params)
+    if not subscription_id(uci.cursor(),params.id) then return invalid("Subscription not found") end
+    local result,err=command({"/etc/init.d/momo","update_subscription",params.id},600000)
+    if not result then return failure(err) end
+    -- Momo's script can exit zero after a failed download; check its UCI result.
+    if uci.cursor():get("momo",params.id,"success")~="1" then return failure("Subscription update failed; see application log") end
+    return {success=true}
+end
+function M.reorder_subscriptions(params)
+    local c=uci.cursor();local ids,anchor=all_ids(c,"subscription")
+    if not array(params.ids) or #params.ids~=#ids then return invalid("Invalid subscription order") end
+    local seen={}
+    for _,id in ipairs(params.ids) do if not subscription_id(c,id) or seen[id] then return invalid("Invalid subscription order") end;seen[id]=true end
+    stabilize_ids(c)
+    for index,id in ipairs(params.ids) do c:reorder("momo",id,anchor+index-1) end
+    if not c:commit("momo") then return failure("Cannot save subscription order") end
+    return {success=true}
+end
+function M.delete_subscription(params)
+    local c=uci.cursor()
+    if not subscription_id(c,params.id) then return invalid("Subscription not found") end
+    if c:get("momo","config","profile")=="subscription:"..params.id then return invalid("Cannot delete the selected profile") end
+    stabilize_ids(c)
+    c:delete("momo",params.id)
+    if not c:commit("momo") then return failure("Cannot delete subscription") end
+    return {success=true}
+end
+local function editor_target(params)
+    local source=params.source
+    if source==nil and params.name~=nil then source="file:"..tostring(params.name) end
+    if type(source)~="string" then return nil end
+    local name=source:match("^file:(.+)$")
+    if name then return profile_path(name),source end
+    local id=source:match("^subscription:([%w_]+)$");local path
+    if id and subscription_id(uci.cursor(),id) then path="/etc/momo/subscriptions/"..id..".json"
+    elseif source=="runtime" then path="/etc/momo/run/config.json" end
+    if not path or not regular(path) then return nil end
+    return path,source,id
+end
+function M.get_profile(params)
+    local path,source,id=editor_target(params)
+    if not path then return invalid("Invalid profile source") end
+    local value=fs.readfile(path)
+    if not value then return failure("Profile does not exist or cannot be read") end
+    return {text=value,source=source,readonly=false,prefer=id and (uci.cursor():get("momo",id,"prefer") or "remote") or nil}
+end
+function M.save_profile(params)
+    local path,source,id=editor_target(params)
+    if not path then return invalid("Invalid profile source") end
+    if not jsonc(params.text) then return invalid("Expected a JSON/JSONC object") end
+    if params.prefer_local~=nil and type(params.prefer_local)~="boolean" then return invalid("Invalid preference") end
+    local random=(fs.readfile("/proc/sys/kernel/random/uuid") or ""):match("^[%x%-]+")
+    if not random then return failure("Cannot create temporary filename") end
+    local temp=path:match("^(.*/)")..".momo-"..random
+    local file=nixio.open(temp,nixio.open_flags("wronly","creat","excl"),600)
+    if not file then return failure("Cannot create profile") end
+    local offset=0
+    while offset<#params.text do
+        local count=file:write(params.text:sub(offset+1));if not count or count==0 then break end;offset=offset+count
+    end
+    local synced=file:sync();file:close()
+    if offset~=#params.text or not synced or not fs.rename(temp,path) then fs.unlink(temp);return failure("Cannot save profile") end
+    if id and params.prefer_local~=nil then
+        local c=uci.cursor();c:set("momo",id,"prefer",params.prefer_local and "local" or "remote")
+        if not c:commit("momo") then return failure("Profile saved, but cannot save preference") end
+    end
+    return {success=true,source=source}
+end
+function M.rename_profile(params)
+    local old,new=profile_path(params.name),profile_path(params.new_name)
+    if not old or not new or not fs.stat(old) then return invalid("Invalid filename") end
+    if old==new then return {success=true,source="file:"..params.name} end
+    if fs.lstat(new) then return invalid("Destination already exists") end
+    if not fs.rename(old,new) then return failure("Cannot rename profile") end
+    local c=uci.cursor()
+    if c:get("momo","config","profile")=="file:"..params.name then
+        c:set("momo","config","profile","file:"..params.new_name)
+        if not c:commit("momo") then fs.rename(new,old);return failure("Cannot update selected profile") end
+    end
+    return {success=true,source="file:"..params.new_name}
+end
+function M.delete_profile(params)
+    local path=profile_path(params.name)
+    if not path or not fs.stat(path) then return invalid("Invalid filename") end
+    if uci.cursor():get("momo","config","profile")=="file:"..params.name then return invalid("Cannot delete the selected profile") end
+    if not fs.unlink(path) then return failure("Cannot delete profile") end
+    return {success=true}
+end
+function M.prepare_download(params)
+    if not filename(params.name) or type(params.text)~="string" then return invalid("Invalid download") end
+    local dir="/tmp/momo-ui-downloads"
+    local st=fs.lstat(dir)
+    if st and st.type~="dir" then return failure("Invalid download directory") end
+    if not st and not fs.mkdir(dir) then return failure("Cannot create download directory") end
+    fs.chmod(dir,700)
+    for name in fs.dir(dir) or function() end do
+        if name:match("^[%x%-]+%.bin$") then
+            local old=fs.lstat(dir.."/"..name)
+            if old and old.type=="reg" and os.time()-(old.mtime or 0)>3600 then fs.unlink(dir.."/"..name) end
+        end
+    end
+    local id=(fs.readfile("/proc/sys/kernel/random/uuid") or ""):match("^[%x%-]+")
+    if not id then return failure("Cannot create download") end
+    local path=dir.."/"..id..".bin"
+    local file=nixio.open(path,nixio.open_flags("wronly","creat","excl"),600)
+    if not file then return failure("Cannot create download") end
+    local offset=0
+    while offset<#params.text do
+        local count=file:write(params.text:sub(offset+1));if not count or count==0 then break end;offset=offset+count
+    end
+    file:close()
+    if offset~=#params.text then fs.unlink(path);return failure("Cannot write download") end
+    return {path=path}
+end
+return M

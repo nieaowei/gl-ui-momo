@@ -1,0 +1,358 @@
+[
+  {
+    "section": "config",
+    "key": "enabled"
+  },
+  {
+    "section": "config",
+    "key": "profile"
+  },
+  {
+    "section": "config",
+    "key": "start_delay"
+  },
+  {
+    "section": "config",
+    "key": "scheduled_restart"
+  },
+  {
+    "section": "config",
+    "key": "scheduled_restart_cron"
+  },
+  {
+    "section": "config",
+    "key": "test_profile"
+  },
+  {
+    "section": "config",
+    "key": "core_only"
+  },
+  {
+    "section": "procd",
+    "key": "fast_reload"
+  },
+  {
+    "section": "procd",
+    "key": "rlimit_nproc_soft"
+  },
+  {
+    "section": "procd",
+    "key": "rlimit_nproc_hard"
+  },
+  {
+    "section": "procd",
+    "key": "rlimit_address_space_soft"
+  },
+  {
+    "section": "procd",
+    "key": "rlimit_address_space_hard"
+  },
+  {
+    "section": "procd",
+    "key": "rlimit_data_soft"
+  },
+  {
+    "section": "procd",
+    "key": "rlimit_data_hard"
+  },
+  {
+    "section": "procd",
+    "key": "rlimit_stack_soft"
+  },
+  {
+    "section": "procd",
+    "key": "rlimit_stack_hard"
+  },
+  {
+    "section": "procd",
+    "key": "rlimit_nofile_soft"
+  },
+  {
+    "section": "procd",
+    "key": "rlimit_nofile_hard"
+  },
+  {
+    "section": "procd",
+    "key": "env_go_max_procs"
+  },
+  {
+    "section": "procd",
+    "key": "env_go_mem_limit"
+  },
+  {
+    "section": "log",
+    "key": "clear_at_stop"
+  },
+  {
+    "section": "log",
+    "key": "scheduled_clear"
+  },
+  {
+    "section": "log",
+    "key": "scheduled_clear_cron"
+  },
+  {
+    "section": "log",
+    "key": "scheduled_clear_size_limit"
+  },
+  {
+    "section": "log",
+    "key": "scheduled_clear_size_limit_unit"
+  },
+  {
+    "section": "mixin",
+    "key": "log_disabled"
+  },
+  {
+    "section": "mixin",
+    "key": "log_level"
+  },
+  {
+    "section": "mixin",
+    "key": "log_timestamp"
+  },
+  {
+    "section": "mixin",
+    "key": "log_output"
+  },
+  {
+    "section": "mixin",
+    "key": "dns_strategy"
+  },
+  {
+    "section": "mixin",
+    "key": "dns_disable_cache"
+  },
+  {
+    "section": "mixin",
+    "key": "dns_disable_expire"
+  },
+  {
+    "section": "mixin",
+    "key": "dns_independent_cache"
+  },
+  {
+    "section": "mixin",
+    "key": "dns_cache_capacity"
+  },
+  {
+    "section": "mixin",
+    "key": "dns_reverse_mapping"
+  },
+  {
+    "section": "mixin",
+    "key": "ntp_enabled"
+  },
+  {
+    "section": "mixin",
+    "key": "ntp_server"
+  },
+  {
+    "section": "mixin",
+    "key": "ntp_server_port"
+  },
+  {
+    "section": "mixin",
+    "key": "ntp_interval"
+  },
+  {
+    "section": "mixin",
+    "key": "cache_enabled"
+  },
+  {
+    "section": "mixin",
+    "key": "cache_path"
+  },
+  {
+    "section": "mixin",
+    "key": "cache_store_fakeip"
+  },
+  {
+    "section": "mixin",
+    "key": "cache_store_rdrc"
+  },
+  {
+    "section": "mixin",
+    "key": "external_control_ui_path"
+  },
+  {
+    "section": "mixin",
+    "key": "external_control_ui_download_url"
+  },
+  {
+    "section": "mixin",
+    "key": "external_control_api_listen"
+  },
+  {
+    "section": "mixin",
+    "key": "external_control_api_secret"
+  },
+  {
+    "section": "subscription",
+    "key": "name"
+  },
+  {
+    "section": "subscription",
+    "key": "used"
+  },
+  {
+    "section": "subscription",
+    "key": "total"
+  },
+  {
+    "section": "subscription",
+    "key": "expire"
+  },
+  {
+    "section": "subscription",
+    "key": "update"
+  },
+  {
+    "section": "subscription",
+    "key": "info_url"
+  },
+  {
+    "section": "subscription",
+    "key": "url"
+  },
+  {
+    "section": "subscription",
+    "key": "user_agent"
+  },
+  {
+    "section": "subscription",
+    "key": "prefer"
+  },
+  {
+    "section": "proxy",
+    "key": "enabled"
+  },
+  {
+    "section": "proxy",
+    "key": "ipv4_dns_hijack"
+  },
+  {
+    "section": "proxy",
+    "key": "ipv6_dns_hijack"
+  },
+  {
+    "section": "proxy",
+    "key": "ipv4_proxy"
+  },
+  {
+    "section": "proxy",
+    "key": "ipv6_proxy"
+  },
+  {
+    "section": "proxy",
+    "key": "fake_ip_ping_hijack"
+  },
+  {
+    "section": "proxy",
+    "key": "tcp_mode"
+  },
+  {
+    "section": "proxy",
+    "key": "udp_mode"
+  },
+  {
+    "section": "proxy",
+    "key": "router_proxy"
+  },
+  {
+    "section": "router_access_control",
+    "key": "enabled"
+  },
+  {
+    "section": "router_access_control",
+    "key": "user"
+  },
+  {
+    "section": "router_access_control",
+    "key": "group"
+  },
+  {
+    "section": "router_access_control",
+    "key": "cgroup"
+  },
+  {
+    "section": "router_access_control",
+    "key": "dns"
+  },
+  {
+    "section": "router_access_control",
+    "key": "proxy"
+  },
+  {
+    "section": "proxy",
+    "key": "lan_proxy"
+  },
+  {
+    "section": "proxy",
+    "key": "lan_inbound_interface"
+  },
+  {
+    "section": "lan_access_control",
+    "key": "enabled"
+  },
+  {
+    "section": "lan_access_control",
+    "key": "ip"
+  },
+  {
+    "section": "lan_access_control",
+    "key": "ip6"
+  },
+  {
+    "section": "lan_access_control",
+    "key": "mac"
+  },
+  {
+    "section": "lan_access_control",
+    "key": "dns"
+  },
+  {
+    "section": "lan_access_control",
+    "key": "proxy"
+  },
+  {
+    "section": "proxy",
+    "key": "bypass_china_mainland_ip"
+  },
+  {
+    "section": "proxy",
+    "key": "bypass_china_mainland_ip6"
+  },
+  {
+    "section": "proxy",
+    "key": "proxy_tcp_dport"
+  },
+  {
+    "section": "proxy",
+    "key": "proxy_udp_dport"
+  },
+  {
+    "section": "proxy",
+    "key": "bypass_dscp"
+  },
+  {
+    "section": "proxy",
+    "key": "bypass_fwmark"
+  },
+  {
+    "section": "proxy",
+    "key": "reserved_ip"
+  },
+  {
+    "section": "proxy",
+    "key": "reserved_ip6"
+  },
+  {
+    "section": "proxy",
+    "key": "tun_timeout"
+  },
+  {
+    "section": "proxy",
+    "key": "tun_interval"
+  }
+]
