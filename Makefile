@@ -25,13 +25,13 @@ endef
 
 define Package/gl-ui-momo/postinst
 #!/bin/sh
-[ -n "$${IPKG_INSTROOT}" ] || { nginx -t && nginx -s reload; }
+[ -n "$${IPKG_INSTROOT}" ] || { nginx -t -q && nginx -s reload; }
 exit 0
 endef
 
 define Package/gl-ui-momo/postrm
 #!/bin/sh
-[ -n "$${IPKG_INSTROOT}" ] || { nginx -t && nginx -s reload; }
+[ -n "$${IPKG_INSTROOT}" ] || { nginx -t -q && nginx -s reload; }
 exit 0
 endef
 
