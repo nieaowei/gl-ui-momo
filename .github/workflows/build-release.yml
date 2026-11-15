@@ -1,0 +1,102 @@
+name: Build and release APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-release.yml'
+      - 'Makefile'
+      - 'files/**'
+      - 'scripts/build-apk.sh'
+      - 'scripts/test-ui.cjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gl-sdk4-ui-momo-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Test and build APKv3
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test UI
+        run: node scripts/test-ui.cjs
+      - name: Build APK and SHA256 checksum
+        run: sh scripts/build-apk.sh
+      - name: Verify artifact and version
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="$(awk -F':=' '$1=="PKG_NAME" {print $2; exit}' Makefile)"
+          version="$(awk -F':=' '$1=="PKG_VERSION" {print $2; exit}' Makefile)"
+          release="$(awk -F':=' '$1=="PKG_RELEASE" {print $2; exit}' Makefile)"
+          file="dist/$name-$version-r$release.apk"
+          test -s "$file"
+          (cd dist && sha256sum -c "$name-$version-r$release.apk.sha256")
+          echo "Verified package $file"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-apk
+          path: |
+            dist/*.apk
+            dist/*.apk.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish versioned GitHub Release
+    needs: [build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: openwrt-apk
+          path: dist
+      - name: Release this package version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          name="$(awk -F':=' '$1=="PKG_NAME" {print $2; exit}' Makefile)"
+          version="$(awk -F':=' '$1=="PKG_VERSION" {print $2; exit}' Makefile)"
+          release="$(awk -F':=' '$1=="PKG_RELEASE" {print $2; exit}' Makefile)"
+          tag="v${version}-r${release}"
+          file="dist/$name-$version-r$release.apk"
+          checksum="$file.sha256"
+          test -s "$file"
+          (cd dist && sha256sum -c "$name-$version-r$release.apk.sha256")
+
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # A package version is immutable: never overwrite vX-rY with a new source commit.
+            existing_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.sha')"
+            if [ "$existing_sha" != "$GITHUB_SHA" ]; then
+              echo "::error::Release $tag already belongs to $existing_sha. Bump PKG_VERSION or PKG_RELEASE before publishing changed code."
+              exit 1
+            fi
+            gh release upload "$tag" "$file" "$checksum" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$tag" "$file" "$checksum" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "$name $version-r$release" \
+              --notes "OpenWrt APK v3 (noarch) built and checksum-verified from commit $GITHUB_SHA. This package is unsigned at origin; the central openwrt-packages repository re-signs it for the official feed."
+          fi
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url,assets \
+            --jq '{url: .url, assets: [.assets[].name]}'
