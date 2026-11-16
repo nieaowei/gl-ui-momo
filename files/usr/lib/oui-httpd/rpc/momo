@@ -243,10 +243,7 @@ function M.get_config()
         for _,field in ipairs(schema.subscription.fields) do item[field.key]=s[field.key] end
         subscriptions[#subscriptions+1]=item
     end)
-    local listen=c:get("uhttpd","main","listen_http")
-    if type(listen)=="table" then listen=listen[1] end
-    local port=tonumber(tostring(listen or ""):match(":(%d+)$")) or 8080
-    return {schema=schema,settings=settings,rules=rules,subscriptions=subscriptions,profiles=profiles(c),version=version,luci_port=port,luci_available=fs.stat("/www/luci-static/resources/view/momo/app.js","type")=="reg"}
+    return {schema=schema,settings=settings,rules=rules,subscriptions=subscriptions,profiles=profiles(c),version=version}
 end
 function M.set_config(params)
     if type(params.settings)~="table" then return invalid("Missing settings") end

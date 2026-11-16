@@ -2,25 +2,25 @@
 -- Never touches the live config, profiles, logs, subscriptions or service.
 local realfs=require "nixio.fs"
 local realnixio=require "nixio"
-local realuci=require "uci"
+local native_uci=require "uci"
 local json=require "cjson.safe"
 local token=assert(realfs.readfile("/proc/sys/kernel/random/uuid")):match("^[%x%-]+")
 local root="/tmp/momo-ui-model-"..token
 assert(realfs.mkdir(root));assert(realfs.chmod(root,700))
 for _,name in ipairs({"save","profiles","subscriptions","logs","run","cgroup"}) do assert(realfs.mkdir(root.."/"..name)) end
-for _,name in ipairs({"momo","network","uhttpd"}) do assert(realfs.writefile(root.."/"..name,(assert(realfs.readfile("/etc/config/"..name))))) end
+for _,name in ipairs({"momo","network"}) do assert(realfs.writefile(root.."/"..name,(assert(realfs.readfile("/etc/config/"..name))))) end
 assert(realfs.writefile(root.."/run/config.json",json.encode({experimental={clash_api={external_controller="127.0.0.1:9095",secret="test-quote'-secret"}}})))
 assert(realfs.writefile(root.."/logs/app.log","application fixture\n"));assert(realfs.writefile(root.."/logs/core.log","core fixture\n"));assert(realfs.writefile(root.."/logs/debug.log","debug fixture\n"))
 assert(realfs.writefile(root.."/passwd","root:x:0:0:root:/root:/bin/sh\nfixture:x:1:1::/:/bin/false\n"))
 assert(realfs.writefile(root.."/group","root:x:0:\nfixture:x:1:\n"))
-assert(realfs.writefile(root.."/installed","P:momo\nV:test-momo\n\nP:gl-ui-momo\nV:2026.10.14~abcdef0-r1\n\nP:gl-sdk4-ui-momo\nV:must-not-use\n\nP:luci-app-momo\nV:must-not-use\n\n"))
+assert(realfs.writefile(root.."/installed","P:momo\nV:test-momo\n\nP:gl-ui-momo\nV:2026.10.14~abcdef0-r1\n\n"))
 assert(realfs.writefile(root.."/schema.json",assert(realfs.readfile(arg[2] or "/usr/share/momo-ui/schema.json"))))
 assert(realfs.writefile(root.."/cgroup/cgroup.controllers","cpu memory\n"))
 for _,name in ipairs({"services","services/test","services/momo","services/momo/private"}) do assert(realfs.mkdir(root.."/cgroup/"..name)) end
 assert(realfs.symlink(root.."/cgroup",root.."/cgroup/loop"))
 local function mapped(p)
     if p:match("^/tmp/momo%-ui%-debug%-[%x%-]+$") then return root.."/logs/"..p:match("([^/]+)$") end
-    for prefix,target in pairs({["/etc/momo/profiles"]="profiles",["/etc/momo/subscriptions"]="subscriptions",["/var/log/momo"]="logs",["/etc/momo/run"]="run",["/tmp/momo-ui-downloads"]="downloads",["/etc/passwd"]="passwd",["/etc/group"]="group",["/lib/apk/db/installed"]="installed",["/usr/lib/opkg/status"]="opkg-status",["/usr/share/momo-ui/schema.json"]="schema.json",["/sys/fs/cgroup"]="cgroup",["/www/luci-static/resources/view/momo/app.js"]="optional-luci.js"}) do
+    for prefix,target in pairs({["/etc/momo/profiles"]="profiles",["/etc/momo/subscriptions"]="subscriptions",["/var/log/momo"]="logs",["/etc/momo/run"]="run",["/tmp/momo-ui-downloads"]="downloads",["/etc/passwd"]="passwd",["/etc/group"]="group",["/lib/apk/db/installed"]="installed",["/usr/lib/opkg/status"]="opkg-status",["/usr/share/momo-ui/schema.json"]="schema.json",["/sys/fs/cgroup"]="cgroup"}) do
         if p==prefix or p:sub(1,#prefix+1)==prefix.."/" then return root.."/"..target..p:sub(#prefix+1) end
     end
     return p
@@ -31,14 +31,14 @@ fs.rename=function(a,b) return realfs.rename(mapped(a),mapped(b)) end
 local nixio={};for k,v in pairs(realnixio) do nixio[k]=v end
 nixio.open=function(p,...) return realnixio.open(mapped(p),...) end
 package.loaded["nixio.fs"]=fs;package.loaded["nixio"]=nixio
-local function cursor() return realuci.cursor(root,root.."/save") end
+local function cursor() return native_uci.cursor(root,root.."/save") end
 package.loaded.uci={cursor=cursor}
 local service_calls,commands={},{}
 local bus_faults={}
 local bus_yield=false
 local service_running=true
 package.loaded["oui.ubus"]={call=function(object,method,args)
-    assert(object~="luci.momo","native UI must never call luci.momo")
+    assert(object=="rc" or object=="service" or object=="luci-rpc","unexpected firmware RPC object")
     if bus_yield then coroutine.yield("rpc pending") end
     local fault=bus_faults[object.."."..method]
     if fault then
@@ -85,17 +85,15 @@ local function ok(label,method,args) local result,err=m[method](args or {});chec
 local function reject(label,method,args) local result=m[method](args or {});check(label,type(result)=="number" or type(result)=="table" and result.err_code~=nil) end
 local success,err=pcall(function()
  local config=m.get_config();local schema=config.schema;local selected_before=cursor():get("momo","config","profile")
- check("version comes from Momo and sing-box without LuCI RPC",config.version.app=="test-momo" and config.version.core=="test-core")
+ check("version comes from Momo and sing-box",config.version.app=="test-momo" and config.version.core=="test-core")
  check("UI version comes from installed gl-ui-momo package",config.version.ui=="2026.10.14~abcdef0-r1")
  check("field schema has no release version",schema.version==nil)
- check("LuCI link hidden when optional UI is absent",config.luci_available==false)
- assert(realfs.writefile(root.."/optional-luci.js","fixture"));check("optional LuCI UI detected",m.get_config().luci_available==true);realfs.unlink(root.."/optional-luci.js")
  local identifiers=m.get_hints();check("native users and groups",#identifiers.users==2 and #identifiers.groups==2)
  check("native cgroups exclude Momo and symlinks",#identifiers.cgroups==2 and identifiers.cgroups[2]=="services/test")
  local count=#schema.subscription.fields
  for _,s in ipairs(schema.sections) do for _,g in ipairs(s.groups) do count=count+#g.fields end end
  for _,r in pairs(schema.rules) do count=count+#r.fields end
- check("89 LuCI fields in shared schema",count==89)
+ check("89 fields in shared schema",count==89)
  local name="中文 配置-"..token..".JSONC";local source="file:"..name
  local content=[[{ // line comment
  "url":"https://example.invalid/a//b/*c*/", /* block */ "array":[1,2,], "quoted":"a\"//b",}]]
@@ -124,7 +122,7 @@ local success,err=pcall(function()
    end
    settings[s.key][f.key]=value
  end end end
- ok("save every static LuCI field","set_config",{settings=settings,apply=false})
+ ok("save every static field","set_config",{settings=settings,apply=false})
  local read=m.get_config().settings
  for section,options in pairs(settings) do for key,value in pairs(options) do
     if type(value)=="table" then check("round trip "..section.."."..key,type(read[section][key])=="table" and #read[section][key]==#value)
@@ -273,7 +271,7 @@ local success,err=pcall(function()
  assert(realfs.writefile(root.."/installed",""));assert(realfs.writefile(root.."/opkg-status","Package: momo\nVersion: opkg-fixture\nStatus: install ok installed\n\n"));check("opkg Momo version fallback",m.get_config().version.app=="opkg-fixture")
  assert(realfs.writefile(root.."/opkg-status","Package: momo\nVersion: opkg-fixture\nStatus: install ok installed\n\nPackage: gl-ui-momo\nVersion: opkg-ui-fixture\nStatus: install ok installed\n\n"));check("opkg UI version fallback",m.get_config().version.ui=="opkg-ui-fixture")
  assert(realfs.writefile(root.."/installed","P:gl-ui-momo\nV:2026.10.14~fedcba0-r1\n\n"));check("UI version refreshes from installed package metadata",m.get_config().version.ui=="2026.10.14~fedcba0-r1")
- assert(realfs.writefile(root.."/installed","P:gl-sdk4-ui-momo\nV:legacy-ui\n\n"));assert(realfs.writefile(root.."/opkg-status",""));check("missing UI package does not use legacy or schema version",m.get_config().version.ui=="")
+ assert(realfs.writefile(root.."/installed","P:momo\nV:test-momo\n\n"));assert(realfs.writefile(root.."/opkg-status",""));check("missing UI package has no fabricated version",m.get_config().version.ui=="")
  -- Firmware uses yielding sockets under Lua 5.1; synchronous mocks miss pcall failures.
  bus_yield=true;command_yield=true
  for _,case in ipairs({{"get_status"},{"get_config"},{"get_hints"},{"debug"},{"update_subscription",{id=a}},{"service",{action="restart"}}}) do

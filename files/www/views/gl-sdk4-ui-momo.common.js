@@ -28,7 +28,7 @@ module.exports = (function () {
         enable_hint: ['立即保存并启动或停止服务，重启路由器后仍按此设置。', 'Save and start or stop immediately. This setting persists after reboot.'],
         enabled_notice: ['已启用 Momo。', 'Momo enabled.'], disabled_notice: ['已关闭 Momo。', 'Momo disabled.'],
         not_running_hint: ['Momo 已启用但未运行，请查看应用日志。', 'Momo is enabled but not running. Check the application log.'],
-        dashboard: ['打开控制面板', 'Open dashboard'], advanced: ['LuCI 高级设置', 'Advanced settings in LuCI'],
+        dashboard: ['打开控制面板', 'Open dashboard'],
         saved: ['已保存', 'Saved'], applied: ['已保存，正在重启服务，请查看运行状态。', 'Saved. Restart requested; check service status.'],
         requested: ['服务操作已提交，请查看运行状态。', 'Service action requested; check service status.'],
         error: ['操作失败', 'Operation failed'], empty: ['暂无数据', 'No data'], loading: ['正在加载…', 'Loading…'],
@@ -102,7 +102,6 @@ module.exports = (function () {
         '.momo-native .momo-log{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;height:420px;max-height:65vh;overflow:auto;margin:8px 0 0;padding:12px 16px;border:1px solid var(--border);border-radius:5px;background:var(--background-subtitle);color:var(--text-regular);box-sizing:border-box}',
         '.momo-native .momo-error{color:var(--error,#d95050);margin:12px 0;line-height:1.6;overflow-wrap:anywhere}',
         '.momo-native .momo-notice{margin:12px 0;color:var(--success,#20a87b);line-height:1.6}',
-        '.momo-native .momo-advanced{margin-top:16px;font-size:12px}',
         '.momo-confirm .momo-actions{display:flex;justify-content:flex-end;gap:8px}',
         '@media(max-width:767px){.momo-native .momo-status{align-items:flex-start}.momo-native .momo-tabs{gap:20px}.momo-native .momo-group>summary{padding:10px 12px}.momo-native .momo-group-content{padding:0 12px 12px}.momo-native .momo-row{gap:8px;flex-wrap:wrap;padding:10px 0}.momo-native .momo-control{width:100%;max-width:100%}.momo-native .momo-label{flex-basis:100%}.momo-native .momo-row.is-switch{flex-wrap:nowrap;min-height:48px}.momo-native .momo-row.is-switch .momo-label{flex-basis:auto}.momo-native .momo-sub-info{grid-template-columns:1fr}.momo-native .momo-footer{align-items:flex-start}.momo-native .momo-footer>.momo-actions{width:100%;justify-content:flex-end}.momo-native .momo-log-options .momo-label{flex-basis:auto}.momo-native .momo-editor .el-textarea__inner{min-height:320px}.momo-native .momo-rule{padding:0 10px 8px}.momo-native .momo-import,.momo-native .gl-btn{padding:0 14px}}'
     ].join('\n');
@@ -160,7 +159,7 @@ module.exports = (function () {
         name:'momo',
         data:function(){return {
             settings:{config:{},procd:{},proxy:{},mixin:{},log:{}},rules:{router_access_control:[],lan_access_control:[]},
-            schema:{sections:[],rules:{},subscription:{fields:[]}},original:'',originalRules:'',hints:{},profiles:[],subscriptions:[],version:{},luciPort:8080,luciAvailable:false,
+            schema:{sections:[],rules:{},subscription:{fields:[]}},original:'',originalRules:'',hints:{},profiles:[],subscriptions:[],version:{},
             clashEnabled:false,proxyData:{proxies:{},groups:[],modes:[]},proxySearch:'',proxyPending:false,proxyError:'',proxyDelays:{},proxyTesting:{},proxyTestGeneration:0,
             running:false,enabled:false,statusLoaded:false,serviceChanging:false,loaded:false,busy:false,error:'',notice:'',active:'general',sub:null,subOriginal:'',
             fileRef:'',fileName:'',fileText:'',fileOriginal:'',fileOriginalTarget:'',fileLoaded:false,fileReadonly:false,
@@ -173,8 +172,7 @@ module.exports = (function () {
             fileDirty:function(){return this.fileLoaded&&(this.fileText!==this.fileOriginal||this.fileTarget!==this.fileOriginalTarget||this.preferLocal!==this.fileOriginalPreference);},
             subDirty:function(){return !!this.sub&&JSON.stringify(this.sub)!==this.subOriginal;},
             hasUnsaved:function(){return this.dirty||this.fileDirty||this.subDirty;},
-            visibleProxyGroups:function(){var data=this.proxyData,query=this.proxySearch.trim().toLowerCase();return (data.groups||[]).map(function(name){return data.proxies[name];}).filter(function(group){return group&&(!query||group.name.toLowerCase().includes(query)||(group.all||[]).some(function(name){return name.toLowerCase().includes(query);}));});},
-            advancedUrl:function(){return 'http://'+window.location.hostname+':'+this.luciPort+'/cgi-bin/luci/admin/services/momo';}
+            visibleProxyGroups:function(){var data=this.proxyData,query=this.proxySearch.trim().toLowerCase();return (data.groups||[]).map(function(name){return data.proxies[name];}).filter(function(group){return group&&(!query||group.name.toLowerCase().includes(query)||(group.all||[]).some(function(name){return name.toLowerCase().includes(query);}));});}
         },
         created:function(){this.fetchConfig();this.refreshStatus();},
         mounted:function(){
@@ -205,7 +203,7 @@ module.exports = (function () {
                 this.schema.sections.forEach(function(section){if(!data.settings[section.key]||Array.isArray(data.settings[section.key]))data.settings[section.key]={};});
                 Object.keys(this.rules).forEach(function(k){if(!Array.isArray(data.rules[k]))data.rules[k]=[];});
                 this.profiles=Array.isArray(data.profiles)?data.profiles:[];this.subscriptions=Array.isArray(data.subscriptions)?data.subscriptions:[];
-                this.version=data.version||{};this.luciPort=data.luci_port||8080;this.luciAvailable=data.luci_available===true;
+                this.version=data.version||{};
                 this.original=JSON.stringify(this.settings);this.originalRules=JSON.stringify(this.rules);this.loaded=true;this.enabled=this.settings.config.enabled==='1';
             },
             fetchConfig:function(){var self=this;return this.run(async function(){await self.loadConfig();try{self.hints=await self.rpc('get_hints');}catch(e){self.hints={};}});},
@@ -463,8 +461,7 @@ module.exports = (function () {
                     this.error?h('p',{class:'momo-error',attrs:{role:'alert'}},[this.error]):null,this.notice?h('p',{class:'momo-notice',attrs:{role:'status'}},[this.notice]):null,
                     h('div',{class:['momo-body','momo-page-'+this.active],attrs:{id:'momo-panel',role:'tabpanel','aria-labelledby':'momo-tab-'+this.active}},body),this.active==='proxies'?null:h('div',{class:'momo-footer'},[h('span',{class:'momo-muted'},[t(this.hasUnsaved?'unsaved':'no_changes')]),h('div',{class:'momo-actions'},this.active==='files'?[
                         btn('save_file',function(){return self.saveFile(false);},false,!this.fileLoaded||!this.fileTarget||!this.fileDirty),btn(this.fileRef==='runtime'?'save_reload':'save_activate',function(){return self.saveFile(true);},true,!this.fileLoaded||!this.fileTarget)
-                    ]:[btn('refresh',this.refresh),btn('save',function(){return self.save(false);},false,!this.loaded||!this.dirty),btn('apply',function(){return self.save(true);},true,!this.loaded)])]),
-                    this.luciAvailable?h('div',{class:'momo-advanced'},[h('a',{class:'text-btn',attrs:{href:this.advancedUrl,target:'_blank',rel:'noopener noreferrer'}},[t('advanced')])]):null
+                    ]:[btn('refresh',this.refresh),btn('save',function(){return self.save(false);},false,!this.loaded||!this.dirty),btn('apply',function(){return self.save(true);},true,!this.loaded)])])
                 ])])
             ]);
         }

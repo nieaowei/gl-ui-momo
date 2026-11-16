@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const schema=JSON.parse(fs.readFileSync(path.join(__dirname,'../files/usr/share/momo-ui/schema.json'),'utf8'));
-const inventory={fields:JSON.parse(fs.readFileSync(path.join(__dirname,'luci-fields.json'),'utf8'))};
+const inventory={fields:JSON.parse(fs.readFileSync(path.join(__dirname,'fields.json'),'utf8'))};
 const sandbox={module:{exports:{}},window:{confirm:()=>true,location:{hostname:'192.168.8.1'}},TextEncoder};
 vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../files/www/views/gl-sdk4-ui-momo.common.js'),'utf8'),sandbox);
 const component=sandbox.module.exports,state=component.data();
@@ -54,8 +54,6 @@ async function main(){
  const saveIndex=calls.findLastIndex(c=>c.method==='save_profile'),applyIndex=calls.findLastIndex(c=>c.method==='set_config');assert(applyIndex>saveIndex);assert.equal(state.dirty,true,'file activation must preserve unrelated unsaved settings');
  await state.loadFile('runtime');assert.equal(state.fileReadonly,false);state.fileText='{}';await state.saveFile(true);assert.equal(calls.at(-2).method,'service');
  state.fileText='changed';state.ask=async()=>true;let navigation=await new Promise(resolve=>component.beforeRouteLeave.call(state,{},{},resolve));assert.equal(navigation,true);state.ask=async()=>false;navigation=await new Promise(resolve=>component.beforeRouteLeave.call(state,{},{},resolve));assert.equal(navigation,false);state.ask=async()=>true;
- state.active='general';state.luciPort=8080;assert.equal(state.advancedUrl,'http://192.168.8.1:8080/cgi-bin/luci/admin/services/momo');
- state.luciAvailable=false;assert(!nodes(component.render.call(state,node)).some(n=>n.tag==='a'&&n.data.attrs?.href===state.advancedUrl),'LuCI link hidden without the optional UI');state.luciAvailable=true;assert(nodes(component.render.call(state,node)).some(n=>n.tag==='a'&&n.data.attrs?.href===state.advancedUrl));state.luciAvailable=false;
  state.active='logs';const actions=nodes(component.render.call(state,node)).filter(n=>n.tag==='gl-button').map(n=>n.children[0]);for(const label of ['Clear log','Download complete log','Scroll to bottom','Generate and download debug report','Update dashboard'])assert(actions.includes(label),label+' action missing');
  let exported;state.$downloadFile=async(...args)=>exported=args;await state.download('momo-test.log','fixture');assert.deepEqual(exported,['/tmp/momo-ui-downloads/test.bin','momo-test.log',true]);
  state.active='general';state.clashEnabled=false;assert(!nodes(component.render.call(state,node)).some(n=>n.data.attrs?.id==='momo-tab-proxies'));

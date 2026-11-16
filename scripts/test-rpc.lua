@@ -23,17 +23,8 @@ local before=assert(fs.readfile("/etc/config/momo"))
 local success,err=pcall(function()
  local config=call("get_config").result;check("read all sections and schema",config and config.schema.version==nil and config.schema.sections and config.schema.rules and config.schema.subscription and config.settings.log and config.settings.procd)
  check("UI package version is available without schema version",type(config.version.ui)=="string")
- check("Momo and core versions without LuCI API",config.version.app~="" and config.version.core~="")
- if os.getenv("MOMO_REQUIRE_NO_LUCI")=="1" then
-   check("LuCI app runtime files are absent",fs.stat("/usr/share/rpcd/ucode/luci.momo")==nil and fs.stat("/www/luci-static/resources/view/momo/app.js")==nil)
-   local listing=assert(io.popen("ubus -S list luci.momo 2>/dev/null"));local objects=listing:read("*a");listing:close();check("luci.momo RPC is unregistered",not objects:find("luci.momo",1,true))
-   check("optional advanced link hidden",config.luci_available==false)
-   if config.settings.config.enabled=="1" and call("get_status").result.running then
-     local report=call("debug").result;check("native debug report without LuCI RPC",report and report.text and report.text:find("Momo Debug Info",1,true)~=nil)
-   end
- end
+ check("Momo and core versions",config.version.app~="" and config.version.core~="")
  check("both ACL groups",type(config.rules.router_access_control)=="table" and type(config.rules.lan_access_control)=="table")
- check("LuCI link port",config.luci_port==8080)
  check("service status",type(call("get_status").result.running)=="boolean")
  check("interface and host hints",type(call("get_hints").result.interfaces)=="table")
  check("current source profile",#call("get_profile",{source=config.settings.config.profile}).result.text>0)
