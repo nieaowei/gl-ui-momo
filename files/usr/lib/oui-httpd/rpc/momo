@@ -65,7 +65,7 @@ local function package_version(name)
 end
 local function versions()
     local output=command({"/usr/bin/sing-box","version"},10000)
-    return {app=package_version("momo"),core=output and output:match("sing%-box version ([^%s]+)") or ""}
+    return {app=package_version("momo"),core=output and output:match("sing%-box version ([^%s]+)") or "",ui=package_version("gl-ui-momo")}
 end
 local function service(action)
     local result, err = bus("rc", "init", {name = "momo", action = action}, 120000)

@@ -13,13 +13,14 @@ assert(realfs.writefile(root.."/run/config.json",json.encode({experimental={clas
 assert(realfs.writefile(root.."/logs/app.log","application fixture\n"));assert(realfs.writefile(root.."/logs/core.log","core fixture\n"));assert(realfs.writefile(root.."/logs/debug.log","debug fixture\n"))
 assert(realfs.writefile(root.."/passwd","root:x:0:0:root:/root:/bin/sh\nfixture:x:1:1::/:/bin/false\n"))
 assert(realfs.writefile(root.."/group","root:x:0:\nfixture:x:1:\n"))
-assert(realfs.writefile(root.."/installed","P:momo\nV:test-momo\n\nP:luci-app-momo\nV:must-not-use\n\n"))
+assert(realfs.writefile(root.."/installed","P:momo\nV:test-momo\n\nP:gl-ui-momo\nV:2026.10.14~abcdef0-r1\n\nP:gl-sdk4-ui-momo\nV:must-not-use\n\nP:luci-app-momo\nV:must-not-use\n\n"))
+assert(realfs.writefile(root.."/schema.json",assert(realfs.readfile(arg[2] or "/usr/share/momo-ui/schema.json"))))
 assert(realfs.writefile(root.."/cgroup/cgroup.controllers","cpu memory\n"))
 for _,name in ipairs({"services","services/test","services/momo","services/momo/private"}) do assert(realfs.mkdir(root.."/cgroup/"..name)) end
 assert(realfs.symlink(root.."/cgroup",root.."/cgroup/loop"))
 local function mapped(p)
     if p:match("^/tmp/momo%-ui%-debug%-[%x%-]+$") then return root.."/logs/"..p:match("([^/]+)$") end
-    for prefix,target in pairs({["/etc/momo/profiles"]="profiles",["/etc/momo/subscriptions"]="subscriptions",["/var/log/momo"]="logs",["/etc/momo/run"]="run",["/tmp/momo-ui-downloads"]="downloads",["/etc/passwd"]="passwd",["/etc/group"]="group",["/lib/apk/db/installed"]="installed",["/usr/lib/opkg/status"]="opkg-status",["/sys/fs/cgroup"]="cgroup",["/www/luci-static/resources/view/momo/app.js"]="optional-luci.js"}) do
+    for prefix,target in pairs({["/etc/momo/profiles"]="profiles",["/etc/momo/subscriptions"]="subscriptions",["/var/log/momo"]="logs",["/etc/momo/run"]="run",["/tmp/momo-ui-downloads"]="downloads",["/etc/passwd"]="passwd",["/etc/group"]="group",["/lib/apk/db/installed"]="installed",["/usr/lib/opkg/status"]="opkg-status",["/usr/share/momo-ui/schema.json"]="schema.json",["/sys/fs/cgroup"]="cgroup",["/www/luci-static/resources/view/momo/app.js"]="optional-luci.js"}) do
         if p==prefix or p:sub(1,#prefix+1)==prefix.."/" then return root.."/"..target..p:sub(#prefix+1) end
     end
     return p
@@ -85,6 +86,8 @@ local function reject(label,method,args) local result=m[method](args or {});chec
 local success,err=pcall(function()
  local config=m.get_config();local schema=config.schema;local selected_before=cursor():get("momo","config","profile")
  check("version comes from Momo and sing-box without LuCI RPC",config.version.app=="test-momo" and config.version.core=="test-core")
+ check("UI version comes from installed gl-ui-momo package",config.version.ui=="2026.10.14~abcdef0-r1")
+ check("field schema has no release version",schema.version==nil)
  check("LuCI link hidden when optional UI is absent",config.luci_available==false)
  assert(realfs.writefile(root.."/optional-luci.js","fixture"));check("optional LuCI UI detected",m.get_config().luci_available==true);realfs.unlink(root.."/optional-luci.js")
  local identifiers=m.get_hints();check("native users and groups",#identifiers.users==2 and #identifiers.groups==2)
@@ -263,6 +266,9 @@ local success,err=pcall(function()
  check("failed debug temporary file removed",debug_path and fs.lstat(debug_path)==nil)
  native_faults["/usr/bin/sing-box"]="missing core\nMOMO_UI_EXIT:127\n";check("core version failure keeps configuration available",m.get_config().schema and m.get_config().version.core=="");native_faults["/usr/bin/sing-box"]=nil
  assert(realfs.writefile(root.."/installed",""));assert(realfs.writefile(root.."/opkg-status","Package: momo\nVersion: opkg-fixture\nStatus: install ok installed\n\n"));check("opkg Momo version fallback",m.get_config().version.app=="opkg-fixture")
+ assert(realfs.writefile(root.."/opkg-status","Package: momo\nVersion: opkg-fixture\nStatus: install ok installed\n\nPackage: gl-ui-momo\nVersion: opkg-ui-fixture\nStatus: install ok installed\n\n"));check("opkg UI version fallback",m.get_config().version.ui=="opkg-ui-fixture")
+ assert(realfs.writefile(root.."/installed","P:gl-ui-momo\nV:2026.10.14~fedcba0-r1\n\n"));check("UI version refreshes from installed package metadata",m.get_config().version.ui=="2026.10.14~fedcba0-r1")
+ assert(realfs.writefile(root.."/installed","P:gl-sdk4-ui-momo\nV:legacy-ui\n\n"));assert(realfs.writefile(root.."/opkg-status",""));check("missing UI package does not use legacy or schema version",m.get_config().version.ui=="")
  -- Firmware uses yielding sockets under Lua 5.1; synchronous mocks miss pcall failures.
  bus_yield=true;command_yield=true
  for _,case in ipairs({{"get_status"},{"get_config"},{"get_hints"},{"debug"},{"update_subscription",{id=a}},{"service",{action="restart"}}}) do

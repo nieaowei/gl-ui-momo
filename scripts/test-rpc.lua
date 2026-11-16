@@ -21,7 +21,8 @@ local function check(label,value)assert(value,label);passed=passed+1;print("PASS
 local function reject(label,method,args)local r=call(method,args);check(label,r.error~=nil or type(r.result)=="table" and r.result.err_code~=nil)end
 local before=assert(fs.readfile("/etc/config/momo"))
 local success,err=pcall(function()
- local config=call("get_config").result;check("read all sections and schema",config and config.schema.version=="1.3.0" and config.settings.log and config.settings.procd)
+ local config=call("get_config").result;check("read all sections and schema",config and config.schema.version==nil and config.schema.sections and config.schema.rules and config.schema.subscription and config.settings.log and config.settings.procd)
+ check("UI package version is available without schema version",type(config.version.ui)=="string")
  check("Momo and core versions without LuCI API",config.version.app~="" and config.version.core~="")
  if os.getenv("MOMO_REQUIRE_NO_LUCI")=="1" then
    check("LuCI app runtime files are absent",fs.stat("/usr/share/rpcd/ucode/luci.momo")==nil and fs.stat("/www/luci-static/resources/view/momo/app.js")==nil)

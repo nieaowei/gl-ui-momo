@@ -13,6 +13,9 @@ state.rpc=async(method,args)=>{calls.push({method,args});if(method==='get_profil
 async function main(){
  state.schema=schema;state.loaded=true;state.profiles=[{value:'subscription:test',label:'Test'}];state.settings={config:{profile:'subscription:test',start_delay:'0'},procd:{},proxy:{},mixin:{},log:{}};state.rules={router_access_control:[],lan_access_control:[]};
  state.original=JSON.stringify(state.settings);state.originalRules=JSON.stringify(state.rules);
+ const versionText=()=>nodes(component.render.call(state,node)).find(n=>n.data.class==='momo-versions').children.join('');
+ state.version={app:'test-momo',core:'test-core',ui:'2026.10.14~abcdef0-r1'};assert.equal(versionText(),'Momo test-momo · sing-box test-core · UI 2026.10.14~abcdef0-r1');
+ state.version.ui='';assert(versionText().endsWith(' · UI —'),'script installation without package metadata shows no fabricated UI version');assert.equal(schema.version,undefined);
  const keys=new Set();for(const s of schema.sections)for(const g of s.groups)for(const f of g.fields)keys.add(s.key+'.'+f.key);for(const[k,r]of Object.entries(schema.rules))for(const f of r.fields)keys.add(k+'.'+f.key);for(const f of schema.subscription.fields)keys.add('subscription.'+f.key);
  assert.equal(keys.size,89);for(const field of inventory.fields)assert(keys.has(field.section+'.'+field.key),field.section+'.'+field.key+' missing from schema');
  const rendered=new Set();for(const tab of ['general','proxy','mixin','logs']){state.active=tab;for(const n of nodes(component.render.call(state,node)))if(n.data.attrs?.['data-momo-field'])rendered.add(n.data.attrs['data-momo-field']);}
