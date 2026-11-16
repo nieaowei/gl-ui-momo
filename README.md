@@ -61,14 +61,13 @@ Momo 和 UI 版本分别读取已安装的 `momo`、`gl-ui-momo` 包元数据，
 
 ### 从中央软件源安装（推荐）
 
-[中央软件源](https://github.com/nieaowei/openwrt-packages) 提供已签名的 APK 和索引。目前发布目录为 **OpenWrt 25.12 / `aarch64_cortex-a53`**，适用于兼容的 GL.iNet SDK4 固件。先按 [Momo 上游说明](https://github.com/nikkinikki-org/OpenWrt-momo) 安装 `momo` 服务，并保留系统原有软件源，以便安装所需依赖。
+[中央软件源](https://github.com/nieaowei/openwrt-packages) 提供已签名的 APK 和索引，通用目录为 **OpenWrt 25.12 / `noarch`**。UI 包不区分 CPU 架构，运行需要兼容的 GL.iNet SDK4 固件。先按 [Momo 上游说明](https://github.com/nikkinikki-org/OpenWrt-momo) 安装适合设备架构的 `momo` 服务，并保留系统原有软件源，以便安装所需依赖。
 
-1. 通过 SSH 登录路由器，确认使用 APK 3，且架构输出为 `aarch64_cortex-a53`。路由器地址按实际情况替换：
+1. 通过 SSH 登录路由器，确认使用 APK 3。路由器地址按实际情况替换：
 
    ```sh
    ssh root@192.168.8.1
    apk --version
-   apk --print-arch
    ```
 
 2. 在路由器上导入中央源签名公钥，再添加软件源：
@@ -78,8 +77,7 @@ Momo 和 UI 版本分别读取已安装的 `momo`、`gl-ui-momo` 包元数据，
    wget -O /etc/apk/keys/nieaowei.pem \
      https://nieaowei.github.io/openwrt-packages/public-key.pem
 
-   arch="$(apk --print-arch)"
-   printf '%s\n' "https://nieaowei.github.io/openwrt-packages/25.12/packages/$arch/packages.adb" \
+   printf '%s\n' 'https://nieaowei.github.io/openwrt-packages/25.12/packages/noarch/packages.adb' \
      > /etc/apk/repositories.d/nieaowei.list
    ```
 
@@ -92,6 +90,8 @@ Momo 和 UI 版本分别读取已安装的 `momo`、`gl-ui-momo` 包元数据，
 4. 刷新 GL 原生后台，打开“应用程序 → Momo”，或访问 `http://192.168.8.1/#/momo`。页面上的 UI 版本来自已安装的 `gl-ui-momo` 包。
 
 中央源的包通过已导入的公钥验证签名，安装时无需 `--allow-untrusted`。如果出现 `UNTRUSTED signature`，检查公钥是否成功下载到 `/etc/apk/keys/nieaowei.pem`；如果找不到包，检查架构和软件源地址，并确认 `apk update` 成功。缺少 `momo` 或 SDK4 依赖时，先补齐对应服务及固件软件源。
+
+原有 `aarch64_cortex-a53` 软件源目录继续保留，已配置该目录的设备可继续使用。
 
 ### 从中央源更新
 
