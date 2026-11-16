@@ -16,6 +16,17 @@ async function main(){
  const versionText=()=>nodes(component.render.call(state,node)).find(n=>n.data.class==='momo-versions').children.join('');
  state.version={app:'test-momo',core:'test-core',ui:'2026.10.14~abcdef0-r1'};assert.equal(versionText(),'Momo test-momo · sing-box test-core · UI 2026.10.14~abcdef0-r1');
  state.version.ui='';assert(versionText().endsWith(' · UI —'),'script installation without package metadata shows no fabricated UI version');assert.equal(schema.version,undefined);
+ const master=()=>nodes(component.render.call(state,node)).filter(n=>n.data.attrs?.['data-momo-field']==='config.enabled');
+ for(const tab of ['general','proxy','mixin','subscriptions','files','logs']){state.active=tab;assert.equal(master().length,1,'one master switch on every tab');}
+ const serviceButtons=nodes(component.render.call(state,node)).filter(n=>n.tag==='gl-button').map(n=>n.children[0]);assert(!serviceButtons.includes('Start')&&!serviceButtons.includes('Stop'));assert(serviceButtons.includes('Restart')&&serviceButtons.includes('Reload configuration'));
+ const originalRpc=state.rpc;let savedEnabled=false,failToggle=false;
+ state.statusLoaded=true;state.syncEnabled(false);state.settings.config.start_delay='9';
+ state.rpc=async(method,args)=>{if(method==='set_config'){assert.deepEqual(JSON.parse(JSON.stringify(args)),{settings:{config:{enabled:args.settings.config.enabled}},apply:true});savedEnabled=args.settings.config.enabled==='1';if(failToggle)throw Error('service action failed');return{success:true};}if(method==='get_status')return{enabled:savedEnabled,running:savedEnabled};throw Error('unexpected master switch RPC '+method);};
+ assert(await state.setEnabled(true));assert.equal(state.enabled,true);assert.equal(state.settings.config.enabled,'1');assert.equal(JSON.parse(state.original).config.enabled,'1');assert.equal(state.settings.config.start_delay,'9');assert.equal(JSON.parse(state.original).config.start_delay,'0');assert(state.dirty,'master switch preserves unrelated unsaved settings');
+ assert(await state.setEnabled(false));assert.equal(state.enabled,false);assert.equal(state.running,false);assert.equal(state.settings.config.enabled,'0');assert(state.dirty);
+ failToggle=true;assert.equal(await state.setEnabled(true),false);assert.equal(state.enabled,true,'read saved state even if applying fails');assert.equal(state.error,'service action failed');assert.equal(state.serviceChanging,false);
+ state.running=false;assert(nodes(component.render.call(state,node)).some(n=>n.children.includes('Enabled, not running')),'enabled and stopped is visible');
+ state.rpc=originalRpc;state.settings.config.start_delay='0';state.error='';state.notice='';assert(!state.dirty);state.active='general';
  const keys=new Set();for(const s of schema.sections)for(const g of s.groups)for(const f of g.fields)keys.add(s.key+'.'+f.key);for(const[k,r]of Object.entries(schema.rules))for(const f of r.fields)keys.add(k+'.'+f.key);for(const f of schema.subscription.fields)keys.add('subscription.'+f.key);
  assert.equal(keys.size,89);for(const field of inventory.fields)assert(keys.has(field.section+'.'+field.key),field.section+'.'+field.key+' missing from schema');
  const rendered=new Set();for(const tab of ['general','proxy','mixin','logs']){state.active=tab;for(const n of nodes(component.render.call(state,node)))if(n.data.attrs?.['data-momo-field'])rendered.add(n.data.attrs['data-momo-field']);}

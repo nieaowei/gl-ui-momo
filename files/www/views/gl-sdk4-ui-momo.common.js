@@ -2,7 +2,7 @@
 module.exports = (function () {
     'use strict';
     var words = {
-        description: ['使用 sing-box 管理透明代理，修改后点击“保存并应用”生效。', 'Manage transparent proxy with sing-box. Save and apply to activate changes.'],
+        description: ['“启用 Momo”开关立即生效；其他设置修改后点击“保存并应用”。', 'Enable Momo takes effect immediately. Save and apply other settings.'],
         running: ['运行中', 'Running'], stopped: ['未运行', 'Stopped'], enabled: ['启用 Momo', 'Enable Momo'],
         status: ['服务状态', 'Service status'], version: ['版本', 'Version'], core: ['内核', 'Core'],
         general: ['基本设置', 'General'], proxy: ['代理设置', 'Proxy'], mixin: ['覆写设置', 'Overrides'],
@@ -23,7 +23,11 @@ module.exports = (function () {
         cache_store_rdrc: ['保存 RDRC 缓存', 'Store RDRC cache'], dns_independent_cache: ['独立 DNS 缓存', 'Independent DNS cache'],
         dns_reverse_mapping: ['DNS 反向映射', 'DNS reverse mapping'],
         save: ['保存', 'Save'], apply: ['保存并应用', 'Save and apply'], refresh: ['刷新', 'Refresh'],
-        restart: ['重启服务', 'Restart'], reload: ['重载服务', 'Reload'], stop: ['停止服务', 'Stop'], start: ['启动服务', 'Start'],
+        restart: ['重启服务', 'Restart'], reload: ['重载配置', 'Reload configuration'],
+        enabled_stopped: ['已启用，未运行', 'Enabled, not running'], service_changing: ['正在应用启用状态…', 'Applying service state…'],
+        enable_hint: ['立即保存并启动或停止服务，重启路由器后仍按此设置。', 'Save and start or stop immediately. This setting persists after reboot.'],
+        enabled_notice: ['已启用 Momo。', 'Momo enabled.'], disabled_notice: ['已关闭 Momo。', 'Momo disabled.'],
+        not_running_hint: ['Momo 已启用但未运行，请查看应用日志。', 'Momo is enabled but not running. Check the application log.'],
         dashboard: ['打开控制面板', 'Open dashboard'], advanced: ['LuCI 高级设置', 'Advanced settings in LuCI'],
         saved: ['已保存', 'Saved'], applied: ['已保存，正在重启服务，请查看运行状态。', 'Saved. Restart requested; check service status.'],
         requested: ['服务操作已提交，请查看运行状态。', 'Service action requested; check service status.'],
@@ -60,6 +64,8 @@ module.exports = (function () {
         '.momo-native .momo-dot.on{background:var(--success,#20a87b)}',
         '.momo-native .momo-versions{font-size:11px;color:var(--text-subtitle);margin-top:6px;line-height:1.5}',
         '.momo-native .momo-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;min-width:0}',
+        '.momo-native .momo-enable{display:flex;align-items:center;gap:10px;margin-right:8px;white-space:nowrap}',
+        '.momo-native .momo-enable-hint{flex-basis:100%;margin:0;font-size:12px;line-height:1.6;color:var(--text-subtitle)}',
         '.momo-native .gl-btn,.momo-confirm .gl-btn{height:36px;min-height:36px;margin:0;padding:0 18px;font-size:14px;line-height:20px;white-space:nowrap;flex-shrink:0}',
         '.momo-native .gl-btn:active:not(.is-disabled):not(.is-loading),.momo-confirm .gl-btn:active:not(.is-disabled):not(.is-loading){padding:0 16px}',
         '.momo-native .momo-tabs{display:flex;gap:24px;border-bottom:1px solid var(--border);margin:0 0 16px;overflow-x:auto;scrollbar-width:thin}',
@@ -156,7 +162,7 @@ module.exports = (function () {
             settings:{config:{},procd:{},proxy:{},mixin:{},log:{}},rules:{router_access_control:[],lan_access_control:[]},
             schema:{sections:[],rules:{},subscription:{fields:[]}},original:'',originalRules:'',hints:{},profiles:[],subscriptions:[],version:{},luciPort:8080,luciAvailable:false,
             clashEnabled:false,proxyData:{proxies:{},groups:[],modes:[]},proxySearch:'',proxyPending:false,proxyError:'',proxyDelays:{},proxyTesting:{},proxyTestGeneration:0,
-            running:false,loaded:false,busy:false,error:'',notice:'',active:'general',sub:null,subOriginal:'',
+            running:false,enabled:false,statusLoaded:false,serviceChanging:false,loaded:false,busy:false,error:'',notice:'',active:'general',sub:null,subOriginal:'',
             fileRef:'',fileName:'',fileText:'',fileOriginal:'',fileOriginalTarget:'',fileLoaded:false,fileReadonly:false,
             preferLocal:true,fileOriginalPreference:true,renameName:null,logKind:'app',logText:'',logAuto:true,logFollow:true,
             timer:null,statusPending:false,logPending:false,disposed:false,unloadHandler:null,confirmVisible:false,confirmMessage:'',confirmResolve:null
@@ -177,7 +183,7 @@ module.exports = (function () {
             window.addEventListener('beforeunload',this.unloadHandler);
             this.timer=setInterval(function(){
                 if(document.hidden)return;
-                self.refreshStatus();if(self.active==='proxies'&&!self.busy)self.loadProxies(false);if(self.active==='logs'&&self.logAuto&&!self.busy)self.loadLog(false);
+                if(!self.busy)self.refreshStatus();if(self.active==='proxies'&&!self.busy)self.loadProxies(false);if(self.active==='logs'&&self.logAuto&&!self.busy)self.loadLog(false);
             },5000);
         },
         beforeRouteLeave:function(to,from,next){if(!this.hasUnsaved)next(true);else this.ask(this.t('leave_confirm')).then(next);},
@@ -200,13 +206,27 @@ module.exports = (function () {
                 Object.keys(this.rules).forEach(function(k){if(!Array.isArray(data.rules[k]))data.rules[k]=[];});
                 this.profiles=Array.isArray(data.profiles)?data.profiles:[];this.subscriptions=Array.isArray(data.subscriptions)?data.subscriptions:[];
                 this.version=data.version||{};this.luciPort=data.luci_port||8080;this.luciAvailable=data.luci_available===true;
-                this.original=JSON.stringify(this.settings);this.originalRules=JSON.stringify(this.rules);this.loaded=true;
+                this.original=JSON.stringify(this.settings);this.originalRules=JSON.stringify(this.rules);this.loaded=true;this.enabled=this.settings.config.enabled==='1';
             },
             fetchConfig:function(){var self=this;return this.run(async function(){await self.loadConfig();try{self.hints=await self.rpc('get_hints');}catch(e){self.hints={};}});},
             refreshLists:async function(){var data=await this.rpc('get_config');this.profiles=Array.isArray(data.profiles)?data.profiles:[];this.subscriptions=Array.isArray(data.subscriptions)?data.subscriptions:[];},
             refreshStatus:async function(){
                 if(this.statusPending||this.disposed)return;this.statusPending=true;
-                try{var data=await this.rpc('get_status');this.running=data.running;this.clashEnabled=data.clash_api===true;if(!this.clashEnabled&&this.active==='proxies'){this.active='general';this.proxyTestGeneration++;}}catch(e){this.error=e&&e.message||this.t('error');}finally{this.statusPending=false;}
+                try{var data=await this.rpc('get_status');this.running=data.running;this.syncEnabled(data.enabled===true);this.statusLoaded=true;this.clashEnabled=data.clash_api===true;if(!this.clashEnabled&&this.active==='proxies'){this.active='general';this.proxyTestGeneration++;}}catch(e){this.error=e&&e.message||this.t('error');}finally{this.statusPending=false;}
+            },
+            syncEnabled:function(enabled){
+                this.enabled=enabled;
+                if(!this.loaded)return;
+                var value=enabled?'1':'0';this.$set(this.settings.config,'enabled',value);
+                var original=JSON.parse(this.original);original.config.enabled=value;this.original=JSON.stringify(original);
+            },
+            setEnabled:function(enabled){
+                if(this.statusPending||!this.statusLoaded||!this.loaded)return Promise.resolve(false);
+                var self=this;return this.run(async function(){
+                    self.serviceChanging=true;
+                    try{await self.rpc('set_config',{settings:{config:{enabled:enabled?'1':'0'}},apply:true},130000);self.syncEnabled(enabled);self.notice=self.t(enabled?'enabled_notice':'disabled_notice');}
+                    finally{await self.refreshStatus();self.serviceChanging=false;}
+                });
             },
             refresh:async function(){if(this.hasUnsaved&&!await this.ask(this.t('refresh_confirm')))return;this.fetchConfig();this.refreshStatus();},
             save:function(apply){
@@ -343,7 +363,7 @@ module.exports = (function () {
             function schemaGroups(){
                 var output=[];
                 (self.schema.sections||[]).filter(function(s){return s.tab===self.active;}).forEach(function(section){
-                    section.groups.forEach(function(g){var children=g.fields.map(function(field){return control(field,self.settings[section.key]||{},function(v){self.$set(self.settings[section.key],field.key,v);},section.key+'.'+field.key);});
+                    section.groups.forEach(function(g){var children=g.fields.filter(function(field){return section.key!=='config'||field.key!=='enabled';}).map(function(field){return control(field,self.settings[section.key]||{},function(v){self.$set(self.settings[section.key],field.key,v);},section.key+'.'+field.key);});
                         output.push(group(self.label(section.label)+' · '+self.label(g.label),children,section.key==='config'||section.key==='log'||g.key==='proxy'||g.key==='log'||g.key==='dns'));
                     });
                 });return output;
@@ -436,8 +456,9 @@ module.exports = (function () {
                 h('el-dialog',{class:'momo-confirm',attrs:{visible:this.confirmVisible,title:self.language()===0?'确认操作':'Confirm action','append-to-body':true,'close-on-click-modal':false},on:{close:function(){self.confirmAnswer(false);}}},[h('p',[this.confirmMessage]),h('div',{slot:'footer',class:'momo-actions'},[btn('cancel',function(){self.confirmAnswer(false);}),h('gl-button',{attrs:{type:'primary'},on:{click:function(){self.confirmAnswer(true);}}},[self.language()===0?'确定':'Confirm'])])]),
                 h('style',[css]),h('gl-title',{attrs:{title:'Momo'}}),h('gl-card',[h('div',{class:'momo-main'},[
                     h('p',{class:'momo-desc'},[t('description')]),h('div',{class:'momo-status'},[
-                        h('div',[h('strong',[h('i',{class:['momo-dot',this.running?'on':'']}),t(this.running?'running':'stopped')]),h('div',{class:'momo-versions'},['Momo '+(this.version.app||'—')+' · sing-box '+(this.version.core||'—')+' · UI '+(this.version.ui||'—')])]),
-                        h('div',{class:'momo-actions'},[btn(this.running?'restart':'start',function(){self.action(self.running?'restart':'start');}),btn('reload',function(){self.action('reload');},false,!this.running),btn('stop',function(){self.action('stop');},false,!this.running),btn('dashboard',this.dashboard,false,!this.running),btn('update_dashboard',this.updateDashboard,false,!this.running)])
+                        h('div',[h('strong',{attrs:{role:'status','aria-live':'polite'}},[h('i',{class:['momo-dot',this.running?'on':'']}),t(this.serviceChanging?'service_changing':this.running?'running':this.enabled?'enabled_stopped':'stopped')]),h('div',{class:'momo-versions'},['Momo '+(this.version.app||'—')+' · sing-box '+(this.version.core||'—')+' · UI '+(this.version.ui||'—')])]),
+                        h('div',{class:'momo-actions'},[h('div',{class:'momo-enable',attrs:{'data-momo-field':'config.enabled',title:t('enable_hint')}},[h('span',[t('enabled')]),h('gl-switch',{attrs:{value:this.enabled,size:'small',disabled:this.busy||this.statusPending||!this.loaded||!this.statusLoaded,'aria-label':t('enabled')},on:{input:this.setEnabled}})]),btn('restart',function(){self.action('restart');},false,!this.enabled),btn('reload',function(){self.action('reload');},false,!this.running),btn('dashboard',this.dashboard,false,!this.running),btn('update_dashboard',this.updateDashboard,false,!this.running)]),
+                        h('p',{class:'momo-enable-hint'},[this.enabled&&!this.running&&!this.serviceChanging?t('not_running_hint'):t('enable_hint')])
                     ]),h('div',{class:'momo-tabs',attrs:{role:'tablist','aria-label':'Momo'}},['general','proxy','mixin','subscriptions','files','logs'].concat(this.clashEnabled?['proxies']:[]).map(function(k){return h('button',{class:['momo-tab',self.active===k?'is-active':''],attrs:{type:'button',role:'tab',id:'momo-tab-'+k,'aria-selected':String(self.active===k),'aria-controls':'momo-panel'},on:{click:function(){self.tab(k);}}},[t(k)]);})),
                     this.error?h('p',{class:'momo-error',attrs:{role:'alert'}},[this.error]):null,this.notice?h('p',{class:'momo-notice',attrs:{role:'status'}},[this.notice]):null,
                     h('div',{class:['momo-body','momo-page-'+this.active],attrs:{id:'momo-panel',role:'tabpanel','aria-labelledby':'momo-tab-'+this.active}},body),this.active==='proxies'?null:h('div',{class:'momo-footer'},[h('span',{class:'momo-muted'},[t(this.hasUnsaved?'unsaved':'no_changes')]),h('div',{class:'momo-actions'},this.active==='files'?[

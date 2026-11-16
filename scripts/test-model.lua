@@ -194,6 +194,11 @@ local success,err=pcall(function()
  check("interface and client hints",#m.get_hints().mac==1)
  local prepared=m.prepare_download({name="中文报告.log",text="download fixture"});check("prepare native authenticated download",prepared.path and fs.readfile(prepared.path)=="download fixture");reject("reject invalid download filename","prepare_download",{name="../bad",text="x"})
  ok("service manager restart","service",{action="restart"});check("service uses fixed manager and action",service_calls[#service_calls].name=="momo" and service_calls[#service_calls].action=="restart")
+ local profile_before=cursor():get("momo","config","profile")
+ for _,enabled in ipairs({"0","1"}) do
+   ok("apply master switch "..enabled,"set_config",{settings={config={enabled=enabled}},apply=true})
+   check("master switch persists and applies "..enabled,cursor():get("momo","config","enabled")==enabled and service_calls[#service_calls].action=="restart" and cursor():get("momo","config","profile")==profile_before)
+ end
  reject("reject service injection","service",{action="restart; false"})
  local proxy_name="中文节点 /?#'\""
  local proxy_fixture={Group={name="Group",type="Selector",now="fast",all={"fast",proxy_name}},Auto={name="Auto",type="URLTest",now="fast",all={"fast",proxy_name}},fast={name="fast",type="Hysteria2",history={{delay=45}},secret="must-not-export"},[proxy_name]={name=proxy_name,type="Hysteria2",history={}},GLOBAL={type="Selector",now="Group",all={"Group","Auto"}}}
