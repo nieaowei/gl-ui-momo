@@ -1,8 +1,9 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const schema=JSON.parse(fs.readFileSync(path.join(__dirname,'../files/usr/share/momo-ui/schema.json'),'utf8'));
+const uiRoot=process.argv[2]?path.resolve(process.argv[2]):path.join(__dirname,'../files');
+const schema=JSON.parse(fs.readFileSync(path.join(uiRoot,'usr/share/momo-ui/schema.json'),'utf8'));
 const inventory={fields:JSON.parse(fs.readFileSync(path.join(__dirname,'fields.json'),'utf8'))};
 const sandbox={module:{exports:{}},window:{confirm:()=>true,location:{hostname:'192.168.8.1'}},TextEncoder};
-vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../files/www/views/gl-sdk4-ui-momo.common.js'),'utf8'),sandbox);
+vm.runInNewContext(fs.readFileSync(path.join(uiRoot,'www/views/gl-sdk4-ui-momo.common.js'),'utf8'),sandbox);
 const component=sandbox.module.exports,state=component.data();
 Object.assign(state,component.methods,{$store:{getters:{lang:'en'}},$set:(o,k,v)=>o[k]=v,$refs:{},$nextTick:fn=>fn.call(state)});
 for(const [key,getter]of Object.entries(component.computed))Object.defineProperty(state,key,{get:()=>getter.call(state)});

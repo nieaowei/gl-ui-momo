@@ -7,6 +7,12 @@ on:
       - '.github/workflows/build-release.yml'
       - 'Makefile'
       - 'files/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/build-assets.cjs'
+      - 'scripts/test-build-assets.cjs'
+      - 'scripts/fields.json'
+      - 'scripts/fixtures/**'
       - 'scripts/build-apk.sh'
       - 'scripts/prepare-release.py'
       - 'scripts/test-release-version.py'
@@ -38,6 +44,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install build dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Test release version resolution
         run: python3 scripts/test-release-version.py
       - name: Resolve upstream service version and project commit
@@ -45,8 +57,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 scripts/prepare-release.py
-      - name: Test UI
-        run: node scripts/test-ui.cjs
+      - name: Test source and minified UI
+        run: npm test
       - name: Build APK and SHA256 checksum
         run: sh scripts/build-apk.sh
       - name: Verify artifact and version

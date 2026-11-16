@@ -1,0 +1,10 @@
+{
+  "name": "gl-ui-momo-build",
+  "private": true,
+  "scripts": {
+    "test": "node scripts/test-ui.cjs && node scripts/test-build-assets.cjs"
+  },
+  "devDependencies": {
+    "terser": "5.31.0"
+  }
+}

@@ -155,15 +155,18 @@ APK 版本使用原生支持的 `~` 分隔提交哈希；文件名将其替换�
 
 ### 直接生成独立 APK
 
-本包只有 Lua、JavaScript 和静态配置，无需交叉编译。安装 Docker 后，在本目录运行：
+本包只有 Lua、JavaScript 和静态配置，无需交叉编译。构建机安装 Node.js 22、npm 和 Docker 后，在本目录运行：
 
 ```sh
+npm ci --ignore-scripts --no-audit --no-fund
 sh scripts/build-apk.sh
 # 可选：指定输出目录
 sh scripts/build-apk.sh /absolute/path/to/output
 ```
 
 默认输出到仓库内已忽略的 `dist/`，包括 `gl-ui-momo-2026.10.14-r1.apk` 和同名 `.sha256` 校验文件；本地构建直接使用 Makefile 中的版本。如需采用发布版本规则，可先运行 `python3 scripts/prepare-release.py`，该命令需要 Python 3、Git 和网络，会更新本地 Makefile 中的版本字段。构建使用固定摘要的 Alpine 镜像和官方 `apk mkpkg`，生成兼容 APK 3.0.5 的 APKv3、`noarch` 安装包；容器构建阶段不访问网络。元数据、依赖、安装/升级/卸载钩子均从本包 Makefile 读取。原生 Linux 已有带 `mkpkg` 的 apk-tools 3 时，也可以设置 `MOMO_APK_NATIVE=1` 构建。
+
+两条打包路径共用 `scripts/build-assets.cjs`：用锁定版本的 Terser 压缩 JS（保留 Vue 属性及 RPC 名称），去除 schema JSON 的格式空白，其他文件逐字节保留。压缩只作用于临时安装目录，仓库源码保持可读。当前安装文件内容合计由 124,664 字节降至约 98,762 字节（121.7 → 96.4 KiB，减少约 20.8%）；实际闪存占用取决于文件系统。打包前对精简后的文件运行 UI 回归，失败即终止构建。Node/npm/Terser 仅用于构建机，不增加路由器运行依赖。首次 `npm ci` 和拉取容器镜像需要网络，准备好后打包阶段无需联网。源码脚本安装仍使用可读原文件。
 
 将 APK 复制到路由器的 `/tmp/` 后安装：
 
@@ -179,10 +182,11 @@ apk del gl-ui-momo
 
 ### 在 OpenWrt 构建系统中编译
 
-在包含 GL.iNet SDK4 包的 OpenWrt 构建环境中：
+在包含 GL.iNet SDK4 包、且构建机已安装 Node.js 22 和 npm 的 OpenWrt 构建环境中：
 
 ```sh
 git clone https://github.com/nieaowei/gl-ui-momo.git package/gl-ui-momo
+npm --prefix package/gl-ui-momo ci --ignore-scripts --no-audit --no-fund
 make package/gl-ui-momo/compile V=s
 ```
 
@@ -193,6 +197,8 @@ make package/gl-ui-momo/compile V=s
 ```sh
 # 本机 Node，无第三方依赖
 node scripts/test-ui.cjs
+# 已安装构建依赖后，验证源码和压缩产物
+npm test
 # 在安装后的路由器运行
 lua scripts/test-model.lua
 lua scripts/test-rpc.lua
@@ -200,6 +206,7 @@ lua scripts/test-native-upgrade.lua /usr/lib/oui-httpd/rpc/plugins
 ```
 
 - UI 回归：89/89 字段、85/85 可写控件、总开关即时生效与草稿保留、原有工作流，以及条件页签、代理/模式切换、测速、搜索和测速并发限制。
+- 构建回归：压缩产物运行同一套 UI 测试，检查 schema 数据一致、安装文件清单一致、Lua 等文件内容不变、源码未改写、构建结果可复现及安装文件体积减少至少 15%。
 - 197 项隔离模型检查：加载实际适配器，将 UCI、配置文件、日志与服务调用隔离；验证字段、文件、规则、订阅和维护接口，SDK4 进程/RPC 兼容性及失败处理，以及代理组排序、中文节点、Selector/URLTest 行为、模式和测速。不会修改实时配置或启停真实服务。模型仅允许已声明的固件 RPC 对象，并覆盖原生命令退出状态、订阅成功标记、Momo/UI 包版本与系统提示。
 - 20 项原生软件包更新适配检查：模拟版本查询、安装和原生列表刷新，覆盖哈希排序倒退、其他软件包转交官方接口、失败处理与 SDK4 协程，不实际安装软件包。
 - 47 项实际 RPC 检查（启用 Clash API 时）：原生下载、字段/规则/提示、非法输入、中文 JSONC 文件管理、代理查询及无变化的节点/模式切换；确认配置逐字节一致。仅创建临时测试文件，不清空真实日志、不更新真实订阅、不启停代理。

@@ -12,11 +12,19 @@ if [ "${MOMO_APK_NATIVE:-0}" != 1 ]; then
     command -v docker >/dev/null 2>&1 || { echo 'Docker is required (or set MOMO_APK_NATIVE=1 with apk-tools 3 installed).' >&2; exit 1; }
     epoch=${SOURCE_DATE_EPOCH:-$(git -C "$package_dir" log -1 --format=%ct 2>/dev/null || echo 0)}
     image=${MOMO_APK_IMAGE:-alpine:3.23@sha256:ff7f0c727dd796aa36787bfcd9a64bf35a6ce72a73451b3359fde849b6703d63}
-    exec docker run --rm --network none \
+    # Minify on the build host; the offline APK container needs no Node/npm.
+    payload_dir=$(mktemp -d)
+    trap 'rm -rf "$payload_dir"' EXIT HUP INT TERM
+    node "$package_dir/scripts/build-assets.cjs" "$payload_dir/root"
+    node "$package_dir/scripts/test-ui.cjs" "$payload_dir/root"
+    docker run --rm --network none \
         --mount "type=bind,src=$package_dir,target=/src,readonly" \
+        --mount "type=bind,src=$payload_dir/root,target=/payload,readonly" \
         --mount "type=bind,src=$output_dir,target=/out" \
+        --env MOMO_APK_PAYLOAD=/payload \
         --env MOMO_APK_NATIVE=1 --env "SOURCE_DATE_EPOCH=$epoch" \
         "$image" sh /src/scripts/build-apk.sh /out
+    exit 0
 fi
 
 case "$(apk --version)" in
@@ -42,7 +50,12 @@ case "$SOURCE_DATE_EPOCH" in ''|*[!0-9]*) echo 'Invalid SOURCE_DATE_EPOCH.' >&2;
 build_root=$(mktemp -d)
 trap 'rm -rf "$build_root"' EXIT HUP INT TERM
 mkdir -p "$build_root/root"
-cp -R "$package_dir/files/." "$build_root/root/"
+if [ -n "${MOMO_APK_PAYLOAD:-}" ]; then
+    cp -R "$MOMO_APK_PAYLOAD/." "$build_root/root/"
+else
+    node "$package_dir/scripts/build-assets.cjs" "$build_root/root"
+    node "$package_dir/scripts/test-ui.cjs" "$build_root/root"
+fi
 find "$build_root/root" -type d -exec chmod 755 {} +
 find "$build_root/root" -type f -exec chmod 644 {} +
 

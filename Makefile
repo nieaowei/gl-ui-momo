@@ -7,6 +7,9 @@ PKG_LICENSE:=GPL-3.0+
 
 include $(INCLUDE_DIR)/package.mk
 
+# Build-host tools only; install with npm ci in this package directory.
+MOMO_NODE ?= node
+
 define Package/gl-ui-momo
   SECTION:=net
   CATEGORY:=Network
@@ -17,10 +20,13 @@ define Package/gl-ui-momo
 endef
 
 define Build/Compile
+	rm -rf $(PKG_BUILD_DIR)/root
+	$(MOMO_NODE) $(CURDIR)/scripts/build-assets.cjs $(PKG_BUILD_DIR)/root
+	$(MOMO_NODE) $(CURDIR)/scripts/test-ui.cjs $(PKG_BUILD_DIR)/root
 endef
 
 define Package/gl-ui-momo/install
-	$(CP) ./files/* $(1)/
+	$(CP) $(PKG_BUILD_DIR)/root/* $(1)/
 endef
 
 define Package/gl-ui-momo/postinst
