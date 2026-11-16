@@ -1,0 +1,71 @@
+-- Momo UI native package upgrade adapter.
+-- SDK4 falls back to plugins.so for methods not exported by this extension.
+local json = require "cjson.safe"
+local rpc = require "oui.rpc"
+local M = {}
+local package_name = "gl-ui-momo"
+
+local function failure(message)
+    return {err_code = -1, err_msg = message}
+end
+
+local function native_install(params)
+    local response = ngx.location.capture("/cgi-bin/glc", {
+        method = ngx.HTTP_POST,
+        body = json.encode({object = "plugins", method = "install_package", args = params})
+    })
+    if response.status ~= ngx.HTTP_OK then return rpc.ERROR_CODE_INTERNAL_ERROR end
+    if type(response.body) ~= "string" then return rpc.ERROR_CODE_INTERNAL_ERROR end
+    local code = tonumber(response.body:match("^%s*(-?%d+)"))
+    if not code then return rpc.ERROR_CODE_INTERNAL_ERROR end
+    local body = response.body:match("^%s*-?%d+%s+(.*)$")
+    if code ~= 0 then return code, body end
+    if not body then return rpc.ERROR_CODE_INTERNAL_ERROR end
+    return json.decode(body) or rpc.ERROR_CODE_INTERNAL_ERROR
+end
+
+local function command(args, timeout)
+    local wrapped = {"/bin/sh", "-c", '"$@" 2>&1; code=$?; printf "\\nMOMO_UI_EXIT:%s\\n" "$code"', "momo-ui"}
+    for _, value in ipairs(args) do wrapped[#wrapped + 1] = value end
+    local process, err = ngx.pipe.spawn(wrapped, {stdout_read_timeout = timeout, merge_stderr = true})
+    if not process then return nil, err end
+    local output, read_err = process:stdout_read_all()
+    if not output then return nil, read_err end
+    local text, status = output:match("^(.*)\nMOMO_UI_EXIT:(%d+)\n$")
+    if not status then return nil, "Command timed out or returned incomplete output" end
+    if tonumber(status) ~= 0 then return nil, "Command failed (exit " .. status .. "): " .. text:sub(1,2048) end
+    return text
+end
+
+local function version(args)
+    local output, err = command(args, 10000)
+    if not output then return nil, err end
+    local value = output:match("Version:%s*([^%s]+)")
+    if not value or #value > 128 or not value:match("^%d[%w%.%+_~%-]*$") then
+        return nil, "Cannot determine gl-ui-momo package version"
+    end
+    return value
+end
+
+function M.install_package(params)
+    local names = type(params) == "table" and params.name
+    if type(names) ~= "table" or #names ~= 1 or names[1] ~= package_name then
+        return native_install(params)
+    end
+    local available, err = version({"/usr/bin/apk", "query", "--available", "--fields", "version", package_name})
+    if not available then return failure(err) end
+    -- An explicit version also handles releases whose commit hashes sort backwards.
+    local output
+    output, err = command({"/usr/bin/apk", "--wait", "30", "add", "--upgrade", package_name .. "=" .. available}, 130000)
+    if not output then return failure(err) end
+    local installed
+    installed, err = version({"/usr/bin/apk", "query", "--installed", "--fields", "version", package_name})
+    if not installed then return failure(err) end
+    if installed ~= available then return failure("Installed version does not match the repository version") end
+    local refreshed
+    refreshed, err = command({"/usr/bin/update_plugins_db", "update"}, 30000)
+    if not refreshed then return failure("Package updated to " .. installed .. "; package list refresh failed: " .. tostring(err)) end
+    return {info = output .. "\nInstalled " .. package_name .. " " .. installed}
+end
+
+return M

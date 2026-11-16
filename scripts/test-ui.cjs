@@ -59,7 +59,7 @@ async function main(){
  state.active='general';state.clashEnabled=false;assert(!nodes(component.render.call(state,node)).some(n=>n.data.attrs?.id==='momo-tab-proxies'));
  const proxyFixture={enabled:true,groups:['Group','Auto'],mode:'Rule',modes:['Rule','Global','Direct'],proxies:{Group:{name:'Group',type:'Selector',all:['Fast','中文 /?#'],now:'Fast'},Auto:{name:'Auto',type:'URLTest',all:['Fast','中文 /?#'],now:'Fast'},Fast:{name:'Fast',type:'Hysteria2',delay:42},'中文 /?#':{name:'中文 /?#',type:'Hysteria2'}}};
  let concurrent=0,maxConcurrent=0;
- state.rpc=async(method,args)=>{calls.push({method,args});if(method==='get_proxies')return proxyFixture;if(method==='get_status')return{running:true,clash_api:false};if(method==='select_proxy')proxyFixture.proxies[args.group].now=args.name;if(method==='set_clash_mode')proxyFixture.mode=args.mode;if(method==='test_proxy'){concurrent++;maxConcurrent=Math.max(maxConcurrent,concurrent);await Promise.resolve();concurrent--;if(args.name==='failed')throw Error('test timeout');return{delay:64};}return{success:true};};
+ state.rpc=async(method,args)=>{calls.push({method,args});if(method==='get_proxies')return proxyFixture;if(method==='get_status')return{running:true,clash_api:false,ui_version:'2026.10.14~fedcba0-r1'};if(method==='select_proxy')proxyFixture.proxies[args.group].now=args.name;if(method==='set_clash_mode')proxyFixture.mode=args.mode;if(method==='test_proxy'){concurrent++;maxConcurrent=Math.max(maxConcurrent,concurrent);await Promise.resolve();concurrent--;if(args.name==='failed')throw Error('test timeout');return{delay:64};}return{success:true};};
  state.clashEnabled=true;state.active='proxies';await state.loadProxies(true);
  assert(nodes(component.render.call(state,node)).some(n=>n.data.attrs?.id==='momo-tab-proxies'));
  let proxyNodes=nodes(component.render.call(state,node));assert(proxyNodes.some(n=>n.tag==='button'&&n.data.attrs?.['aria-label']==='Group: 中文 /?#'&&!n.data.attrs.disabled));assert(proxyNodes.find(n=>n.data.attrs?.['aria-label']==='Auto: 中文 /?#').data.attrs.disabled,'URLTest must remain read-only');
@@ -69,7 +69,7 @@ async function main(){
  await state.testProxy('Fast');assert.equal(state.proxyDelays.Fast,64);await state.testProxy('failed');assert.equal(state.proxyDelays.failed,0);
  await state.testProxyGroup({all:['a','b','c','d','e','f','g']});assert(maxConcurrent<=3&&maxConcurrent>1,'group latency tests use bounded concurrency');
  state.proxyData.proxies.Cycle={now:'Cycle'};assert.equal(state.proxyPath('Cycle').length,1,'cyclic proxy groups cannot hang rendering');
- await state.refreshStatus();assert.equal(state.clashEnabled,false);assert.equal(state.active,'general');
+ const draft=JSON.stringify(state.settings);await state.refreshStatus();assert.equal(state.clashEnabled,false);assert.equal(state.active,'general');assert.equal(state.version.ui,'2026.10.14~fedcba0-r1');assert.equal(JSON.stringify(state.settings),draft,'version polling preserves unsaved settings');
  console.log('PASS 89/89 schema fields, 85/85 writable controls, existing workflows, conditional Clash tab, proxy selection, mode switching, latency tests and bounded concurrency');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});

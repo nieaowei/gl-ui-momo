@@ -210,7 +210,7 @@ module.exports = (function () {
             refreshLists:async function(){var data=await this.rpc('get_config');this.profiles=Array.isArray(data.profiles)?data.profiles:[];this.subscriptions=Array.isArray(data.subscriptions)?data.subscriptions:[];},
             refreshStatus:async function(){
                 if(this.statusPending||this.disposed)return;this.statusPending=true;
-                try{var data=await this.rpc('get_status');this.running=data.running;this.syncEnabled(data.enabled===true);this.statusLoaded=true;this.clashEnabled=data.clash_api===true;if(!this.clashEnabled&&this.active==='proxies'){this.active='general';this.proxyTestGeneration++;}}catch(e){this.error=e&&e.message||this.t('error');}finally{this.statusPending=false;}
+                try{var data=await this.rpc('get_status');this.running=data.running;if(typeof data.ui_version==='string')this.$set(this.version,'ui',data.ui_version);this.syncEnabled(data.enabled===true);this.statusLoaded=true;this.clashEnabled=data.clash_api===true;if(!this.clashEnabled&&this.active==='proxies'){this.active='general';this.proxyTestGeneration++;}}catch(e){this.error=e&&e.message||this.t('error');}finally{this.statusPending=false;}
             },
             syncEnabled:function(enabled){
                 this.enabled=enabled;

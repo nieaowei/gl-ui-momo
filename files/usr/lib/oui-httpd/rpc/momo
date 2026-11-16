@@ -224,7 +224,7 @@ function M.get_status()
     if not services then return failure(err) end
     local running=false
     for _,instance in pairs((services.momo or {}).instances or {}) do running=running or instance.running==true end
-    return {running=running,enabled=uci.cursor():get("momo","config","enabled")=="1",clash_api=running and dashboard()~=nil}
+    return {running=running,enabled=uci.cursor():get("momo","config","enabled")=="1",clash_api=running and dashboard()~=nil,ui_version=package_version("gl-ui-momo")}
 end
 function M.get_config()
     local c=uci.cursor()
