@@ -71,6 +71,16 @@ async function main(){
  await state.testProxyGroup({all:['a','b','c','d','e','f','g']});assert(maxConcurrent<=3&&maxConcurrent>1,'group latency tests use bounded concurrency');
  state.proxyData.proxies.Cycle={now:'Cycle'};assert.equal(state.proxyPath('Cycle').length,1,'cyclic proxy groups cannot hang rendering');
  const draft=JSON.stringify(state.settings);await state.refreshStatus();assert.equal(state.clashEnabled,false);assert.equal(state.active,'general');assert.equal(state.version.ui,'2026.10.14~fedcba0-r1');assert.equal(JSON.stringify(state.settings),draft,'version polling preserves unsaved settings');
+ const tabList=state.tabKeys().map(()=>({focus(){this.focused=true;}}));
+ state.tabKey({key:'ArrowRight',preventDefault(){},currentTarget:{parentNode:{querySelectorAll(){return tabList;}}}},0);assert.equal(state.active,'proxy');assert(tabList[1].focused);
+ state.tabKey({key:'End',preventDefault(){},currentTarget:{parentNode:{querySelectorAll(){return tabList;}}}},1);assert.equal(state.active,'logs');assert(tabList[5].focused);
+ state.tabKey({key:'Home',preventDefault(){},currentTarget:{parentNode:{querySelectorAll(){return tabList;}}}},5);assert.equal(state.active,'general');assert(tabList[0].focused);
+ state.active='general';const summaryTexts=nodes(component.render.call(state,node)).filter(n=>n.tag==='summary').map(n=>nodes(n).flatMap(c=>c.children).filter(c=>typeof c==='string').join(''));
+ assert(summaryTexts.includes('Process')&&!summaryTexts.includes('Process · Process'),'deduplicated group summary titles');
+ state.settings.config.start_delay='15';state.addRule('router_access_control');assert.equal(state.tabDirty('general'),true);assert.equal(state.tabDirty('proxy'),true);
+ state.ask=async()=>true;assert.equal(await state.discardChanges(),true);assert.equal(state.settings.config.start_delay,'0');assert.equal(state.rules.router_access_control.length,0);assert.equal(state.dirty,false);
+ state.logText='info: started\nWARN: slow upstream\nerror: dial failed\n';state.logErrorsOnly=true;assert.equal(state.visibleLogText,'WARN: slow upstream\nerror: dial failed');
+ state.logSearch='dial';assert.equal(state.visibleLogText,'error: dial failed');assert.equal(state.logText,'info: started\nWARN: slow upstream\nerror: dial failed\n');
  console.log('PASS 89/89 schema fields, 85/85 writable controls, existing workflows, conditional Clash tab, proxy selection, mode switching, latency tests and bounded concurrency');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
